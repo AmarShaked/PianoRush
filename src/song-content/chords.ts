@@ -48,3 +48,14 @@ export function chordAt(chords: readonly (readonly [number, string])[], beat: nu
   }
   return current;
 }
+
+const SHARP_ROOTS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] as const;
+
+/** Transpose a chord symbol by semitones, e.g. ("G7", 5) → "C7", ("C", 10) → "Bb". */
+export function transposeChord(symbol: string, semitones: number): string {
+  const m = /^([A-G])([#b]?)(.*)$/.exec(symbol);
+  const chord = parseChord(symbol);
+  if (!m || !chord) throw new Error(`Unknown chord ${symbol}`);
+  const root = (((chord.root + semitones) % 12) + 12) % 12;
+  return `${SHARP_ROOTS[root]}${m[3] ?? ''}`;
+}

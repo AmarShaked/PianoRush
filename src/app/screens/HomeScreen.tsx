@@ -1,4 +1,4 @@
-import { DEFAULT_KEY_MAP } from '../../piano-input/KeyboardSimulator';
+import { DEFAULT_KEY_MAP, keyLabel } from '../../piano-input/KeyboardSimulator';
 import { midiToNoteName } from '../../piano-input/noteNames';
 import { isPlayable, songFor } from '../catalog';
 import { GAME_MODES, type GameMode, type LevelDefinition, type WorldDefinition } from '../../song-content/level';
@@ -30,7 +30,7 @@ interface HomeScreenProps {
 }
 
 const KEY_HINTS: Record<number, string> = Object.fromEntries(
-  Object.entries(DEFAULT_KEY_MAP).map(([code, note]) => [note, code.replace('Key', '')]),
+  Object.entries(DEFAULT_KEY_MAP).map(([code, note]) => [note, keyLabel(code)]),
 );
 
 const MODE_INFO: Record<GameMode, { icon: string; text: string }> = {
@@ -131,7 +131,7 @@ export function HomeScreen(props: HomeScreenProps) {
                 <p className="objective">{selected.objective}</p>
                 <p className="muted small">
                   {!freePlay && `“${selected.song.title}” · `}
-                  {selected.song.bpm} BPM · {seconds}s · keys {selected.song.lanes.map(midiToNoteName).join(' ')}
+                  {selected.song.bpm} BPM · {seconds}s · keys {selected.song.lanes.map((m) => midiToNoteName(m, selected.song.preferFlats)).join(' ')}
                 </p>
                 <p className="muted small credit">{selected.song.composer}</p>
               </div>
@@ -145,8 +145,8 @@ export function HomeScreen(props: HomeScreenProps) {
 
             <MiniKeyboard
               className="guide-keyboard"
-              from={48}
-              to={83}
+              from={Math.min(48, Math.floor(Math.min(...selected.song.lanes) / 12) * 12)}
+              to={Math.max(83, Math.ceil((Math.max(...selected.song.lanes) + 1) / 12) * 12 - 1)}
               lanes={selected.song.lanes}
               keyHints={settings.keyboardSimulator ? KEY_HINTS : {}}
             />
@@ -268,6 +268,10 @@ export function HomeScreen(props: HomeScreenProps) {
             <label className="toggle">
               <input type="checkbox" checked={settings.showNoteLabels} onChange={(e) => onSettingsChange({ showNoteLabels: e.target.checked })} />
               <span>Note letters on tiles</span>
+            </label>
+            <label className="toggle">
+              <input type="checkbox" checked={settings.showFingers} onChange={(e) => onSettingsChange({ showFingers: e.target.checked })} />
+              <span>Finger numbers on keys</span>
             </label>
             <label className="toggle">
               <input type="checkbox" checked={settings.showKeyHints} onChange={(e) => onSettingsChange({ showKeyHints: e.target.checked })} />

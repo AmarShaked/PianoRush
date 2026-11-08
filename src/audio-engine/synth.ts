@@ -294,3 +294,30 @@ export function piano(ctx: BaseAudioContext, out: AudioNode, t: number, midi: nu
   g.gain.setTargetAtTime(0.0001, t + 0.004, decay / 4);
   return voice(g, oscs, t + decay + 0.5);
 }
+
+/** Soft lead for the band's melody (Chord City): filtered square with gentle vibrato. */
+export function lead(ctx: BaseAudioContext, out: AudioNode, t: number, midi: number, dur: number, vel: number): Voice {
+  const g = envGain(ctx, out);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 2400;
+  lp.connect(g);
+  const o = ctx.createOscillator();
+  o.type = 'square';
+  o.frequency.value = midiToHz(midi);
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 5.5;
+  const depth = ctx.createGain();
+  depth.gain.setValueAtTime(0, t);
+  depth.gain.linearRampToValueAtTime(6, t + Math.min(0.4, dur)); // cents-ish vibrato fades in
+  lfo.connect(depth).connect(o.detune);
+  o.connect(lp);
+  const peak = vel * 0.16;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + 0.015);
+  g.gain.setTargetAtTime(peak * 0.75, t + 0.02, 0.2);
+  g.gain.setTargetAtTime(0, t + Math.max(0.03, dur - 0.04), 0.04);
+  o.start(t);
+  lfo.start(t);
+  return voice(g, [o, lfo], t + dur + 0.25);
+}

@@ -3,10 +3,11 @@ import type { LevelDefinition, WorldDefinition } from '../song-content/level';
 import { HITS } from '../song-content/levels/hits';
 import { WORLD_1 } from '../song-content/levels/world1';
 import { WORLD_2 } from '../song-content/levels/world2';
+import { WORLD_3 } from '../song-content/levels/world3';
 import { isLevelUnlocked, type ProgressMap } from '../game-engine/progression';
 
 /** Learning-path worlds (levels unlock in order). Further worlds append here. */
-export const WORLDS: readonly WorldDefinition[] = [WORLD_1, WORLD_2];
+export const WORLDS: readonly WorldDefinition[] = [WORLD_1, WORLD_2, WORLD_3];
 /** Everything selectable on the home screen: the path worlds plus free-play lists. */
 export const COLLECTIONS: readonly WorldDefinition[] = [...WORLDS, HITS];
 /** The learning path's levels, in order. */

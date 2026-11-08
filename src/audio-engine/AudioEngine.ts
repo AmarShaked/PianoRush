@@ -1,6 +1,6 @@
 import type { BackingNote } from './arranger';
 import { ClockSync } from './ClockSync';
-import { bass, clap, click, crash, hat, keys, kick, openHat, pad, piano, snare, synthBass, type Voice } from './synth';
+import { bass, clap, click, crash, hat, keys, kick, lead, openHat, pad, piano, snare, synthBass, type Voice } from './synth';
 
 export interface Volumes {
   /** 0..1 */
@@ -159,6 +159,9 @@ export class AudioEngine {
         break;
       case 'keys':
         voice = keys(ctx, out, t, note.midi ?? 48, durationSec, v);
+        break;
+      case 'lead':
+        voice = lead(ctx, out, t, note.midi ?? 72, durationSec, v);
         break;
       case 'click':
         voice = click(ctx, out, t, note.accent ?? false, v);

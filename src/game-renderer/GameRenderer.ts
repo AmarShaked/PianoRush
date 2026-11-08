@@ -13,6 +13,14 @@ export interface LaneInfo {
   /** Computer-keyboard key for the simulator, e.g. "A". */
   readonly keyHint?: string;
   readonly isMiddleC: boolean;
+  /** A black key: dark lane and a black key in the strip. */
+  readonly isBlack?: boolean;
+  /** Which hand plays this lane (two-hand songs get a divider). */
+  readonly hand?: 'left' | 'right';
+  /** Suggested finger (1 = thumb … 5 = little finger), shown on the key. */
+  readonly finger?: number;
+  /** Landmark badge for a non-middle-C reference key, e.g. "LOW C". */
+  readonly badge?: string;
 }
 
 export interface GameRendererOptions {
@@ -265,7 +273,7 @@ export class GameRenderer {
     bg.rect(0, 0, width, layout.keysTop).fill(sideGradient);
     lanes.forEach((_, i) => {
       const x = left + i * laneWidth;
-      bg.rect(x, 0, laneWidth, layout.keysTop).fill({ color: i % 2 ? COLORS.laneB : COLORS.laneA, alpha: 0.92 });
+      bg.rect(x, 0, laneWidth, layout.keysTop).fill({ color: lanes[i]!.isBlack ? 0x08080f : i % 2 ? COLORS.laneB : COLORS.laneA, alpha: 0.92 });
       // faint lane-coloured wash near the hit line
       const wash = new FillGradient({
         type: 'linear',
@@ -281,7 +289,9 @@ export class GameRenderer {
     });
     for (let i = 0; i <= lanes.length; i++) {
       const x = left + i * laneWidth;
-      bg.rect(x - 1, 0, 2, layout.keysTop).fill({ color: COLORS.separator, alpha: i === 0 || i === lanes.length ? 0.9 : 0.6 });
+      const handChange = i > 0 && i < lanes.length && lanes[i - 1]!.hand !== lanes[i]!.hand;
+      if (handChange) bg.rect(x - 3, 0, 6, layout.keysTop + layout.keysHeight).fill({ color: 0xffffff, alpha: 0.35 });
+      else bg.rect(x - 1, 0, 2, layout.keysTop).fill({ color: COLORS.separator, alpha: i === 0 || i === lanes.length ? 0.9 : 0.6 });
     }
     // keyboard bed
     bg.rect(0, layout.keysTop, width, layout.keysHeight).fill(0x07070f);
@@ -309,11 +319,42 @@ export class GameRenderer {
     // Key labels (static text)
     for (const child of this.keyLabels.removeChildren()) child.destroy();
     const kh = layout.keysHeight;
+    // Two-hand songs: label each hand's group of lanes under the HUD.
+    if (new Set(lanes.map((l) => l.hand ?? 'right')).size > 1) {
+      for (const hand of ['left', 'right'] as const) {
+        const idx = lanes.map((l, i) => ((l.hand ?? 'right') === hand ? i : -1)).filter((i) => i >= 0);
+        if (!idx.length) continue;
+        const label = new Text({
+          text: hand === 'left' ? 'LEFT HAND' : 'RIGHT HAND',
+          style: { fontFamily: FONT_FAMILY, fontSize: 12, fontWeight: '800', fill: 0xffffff, letterSpacing: 2 },
+          anchor: { x: 0.5, y: 1 },
+        });
+        label.alpha = 0.55;
+        label.position.set(left + ((idx[0]! + idx.at(-1)! + 1) / 2) * laneWidth, layout.keysTop - 4);
+        this.keyLabels.addChild(label);
+      }
+    }
+    const fontScale = Math.min(1, laneWidth / 90);
     lanes.forEach((lane, i) => {
       const cx = left + (i + 0.5) * laneWidth;
+      if (lane.finger) {
+        const finger = new Text({
+          text: String(lane.finger),
+          style: { fontFamily: FONT_FAMILY, fontSize: 13, fontWeight: '900', fill: 0xffffff },
+          anchor: 0.5,
+        });
+        finger.position.set(cx, layout.keysTop + 22);
+        finger.tint = lane.isBlack ? 0xffffff : 0x14142a;
+        this.keyLabels.addChild(finger);
+      }
       const name = new Text({
         text: lane.noteName,
-        style: { fontFamily: FONT_FAMILY, fontSize: Math.round(clamp(kh * 0.2, 13, 22)), fontWeight: '800', fill: 0x1b1b2b },
+        style: {
+          fontFamily: FONT_FAMILY,
+          fontSize: Math.round(clamp(kh * 0.2, 13, 22) * Math.max(0.65, fontScale)),
+          fontWeight: '800',
+          fill: lane.isBlack ? 0xf0f0ff : 0x1b1b2b,
+        },
         anchor: { x: 0.5, y: 1 },
       });
       name.position.set(cx, layout.height - kh * 0.1);
@@ -321,16 +362,16 @@ export class GameRenderer {
       if (this.opts.showKeyHints && lane.keyHint) {
         const hint = new Text({
           text: lane.keyHint,
-          style: { fontFamily: FONT_FAMILY, fontSize: Math.round(clamp(kh * 0.15, 11, 16)), fontWeight: '700', fill: 0x5a5a7a },
+          style: { fontFamily: FONT_FAMILY, fontSize: Math.round(clamp(kh * 0.15, 11, 16)), fontWeight: '700', fill: lane.isBlack ? 0xb0b0d0 : 0x5a5a7a },
           anchor: { x: 0.5, y: 1 },
         });
         hint.position.set(cx, layout.height - kh * 0.1 - name.height - 2);
         this.keyLabels.addChild(hint);
       }
-      if (lane.isMiddleC) {
+      if (lane.isMiddleC || lane.badge) {
         this.middleCOutside = i === 0 && left >= 120;
         const badge = new Text({
-          text: 'MIDDLE C',
+          text: lane.isMiddleC ? 'MIDDLE C' : lane.badge!,
           style: { fontFamily: FONT_FAMILY, fontSize: 12, fontWeight: '800', fill: 0xffffff, letterSpacing: 1.5 },
           anchor: this.middleCOutside ? { x: 1, y: 0.5 } : { x: 0.5, y: 0.5 },
         });
@@ -424,6 +465,8 @@ export class GameRenderer {
     const gap = 3;
     const radius = Math.min(12, layout.laneWidth * 0.1);
     let labelIndex = 0;
+    // Pending tiles grouped by musical event: chords get a connecting bar.
+    const chordSpans = new Map<number, { minX: number; maxX: number; y: number; count: number; color: number }>();
 
     for (const n of s.notes) {
       // Notes are time-sorted: once one is above the screen, all later ones are too.
@@ -499,9 +542,23 @@ export class GameRenderer {
       }
       g.roundRect(x, top, w, h, radius).stroke({ width: 2, color: shade(color, 0.55), alpha: 0.9 * a });
 
+      if (a >= 0.6) {
+        const span = chordSpans.get(n.eventId);
+        const cx = x + w / 2;
+        if (span) {
+          span.minX = Math.min(span.minX, cx);
+          span.maxX = Math.max(span.maxX, cx);
+          span.count++;
+        } else chordSpans.set(n.eventId, { minX: cx, maxX: cx, y: bottom, count: 1, color });
+      }
       if (this.opts.showTileLabels && h >= 24 && a >= 0.6) this.placeLabel(labelIndex++, n, x + w / 2, bottom - Math.min(h, 26) / 2 - 1, layout);
     }
     for (let i = labelIndex; i < this.labelPool.length; i++) this.labelPool[i]!.visible = false;
+    for (const span of chordSpans.values()) {
+      if (span.count < 2) continue;
+      g.roundRect(span.minX, span.y - 8, span.maxX - span.minX, 6, 3).fill({ color: 0xffffff, alpha: 0.55 });
+      for (const x of [span.minX, span.maxX]) g.circle(x, span.y - 5, 5).fill({ color: 0xffffff, alpha: 0.8 });
+    }
   }
 
   private placeLabel(index: number, n: Readonly<NoteState>, x: number, y: number, layout: PlayfieldLayout): void {
@@ -604,12 +661,13 @@ export class GameRenderer {
       const h = keysHeight - 10;
       const color = laneColor(i);
       g.roundRect(x, y + 4, w, h, 8).fill({ color: COLORS.keyShadow, alpha: pressed ? 0 : 1 });
-      g.roundRect(x, y, w, h, 8).fill(pressed ? shade(color, 0.45) : COLORS.keyWhite);
+      g.roundRect(x, y, w, h, 8).fill(pressed ? shade(color, 0.45) : lane.isBlack ? 0x22222e : COLORS.keyWhite);
+      if (lane.finger) g.circle(x + w / 2, keysTop + 22 + (pressed ? 3 : 0), 10).fill({ color: lane.isBlack ? 0x3a3a50 : 0xd8d8e8 });
       g.rect(x, y, w, 5).fill(color);
       if (!pressed && s.waitingFor.includes(lane.midi)) {
         g.roundRect(x + 2, y + 2, w - 4, h - 4, 7).stroke({ width: 4, color });
       }
-      if (lane.isMiddleC) {
+      if (lane.isMiddleC || lane.badge) {
         if (this.middleCOutside) {
           const ty = keysTop + keysHeight * 0.62;
           g.poly([left - 20, ty - 7, left - 8, ty, left - 20, ty + 7]).fill(0xff4d6d);
@@ -624,7 +682,8 @@ export class GameRenderer {
     for (let i = 0; i < lanes.length - 1; i++) {
       const a = lanes[i]!;
       const b = lanes[i + 1]!;
-      if (b.midi - a.midi !== 2) continue;
+      // Only where the key in between is a real black key (B-flat → C has a white B between).
+      if (b.midi - a.midi !== 2 || ![1, 3, 6, 8, 10].includes((a.midi + 1) % 12)) continue;
       const bx = left + (i + 1) * laneWidth;
       const bw = laneWidth * 0.34;
       g.roundRect(bx - bw / 2, keysTop + 2, bw, keysHeight * 0.4, 5).fill(COLORS.keyBlack).stroke({ width: 1, color: 0x33334a });

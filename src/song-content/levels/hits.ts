@@ -1,7 +1,13 @@
 import type { LevelDefinition, WorldDefinition } from '../level';
 import { SONG_SCHEMA_VERSION, type BackingStyle, type SongDefinition } from '../schema';
 import { sequence } from '../notation';
+import { fiveFingerFingering } from '../parts';
 import {
+  AMAZING_GRACE,
+  BRAHMS_LULLABY,
+  FUR_ELISE,
+  GREENSLEEVES,
+  JOY_TO_THE_WORLD,
   AU_CLAIR,
   AUNT_RHODY,
   HOT_CROSS_BUNS,
@@ -20,16 +26,25 @@ import {
  * Faster tempos and full-energy arrangements; separate progress from World 1.
  */
 
-function hit(id: string, tune: PublicDomainTune, bpm: number, style: BackingStyle, objective: string, number: number): LevelDefinition {
+function hit(
+  id: string,
+  tune: PublicDomainTune,
+  bpm: number,
+  style: BackingStyle,
+  objective: string,
+  number: number,
+  meter: readonly [number, number] = [4, 4],
+): LevelDefinition {
   const song: SongDefinition = {
     schemaVersion: SONG_SCHEMA_VERSION,
     id,
     title: tune.title,
     composer: tune.credit,
     bpm,
-    timeSignature: [4, 4],
-    countInBeats: 4,
+    timeSignature: meter,
+    countInBeats: meter[0] === 3 ? 6 : 4,
     lanes: tune.lanes,
+    fingers: fiveFingerFingering(tune.lanes, 'right', 60),
     notes: sequence(tune.steps),
     holdMinBeats: 1.5,
     backing: { style, chords: tune.chords },
@@ -64,5 +79,10 @@ export const HITS: WorldDefinition = {
     hit('hits-lightly-row', LIGHTLY_ROW, 112, 'dance', 'Glide through the long notes.', 8),
     hit('hits-aunt-rhody', AUNT_RHODY, 120, 'groove', 'An old folk tune with a new groove.', 9),
     hit('hits-hot-cross-buns', HOT_CROSS_BUNS, 120, 'pop', 'Three keys, quick eighth notes.', 10),
+    hit('hits-joy-to-the-world', JOY_TO_THE_WORLD, 116, 'dance', 'A full octave, top to bottom.', 11),
+    hit('hits-brahms-lullaby', BRAHMS_LULLABY, 92, 'waltz', 'A gentle waltz across the octave.', 12, [3, 4]),
+    hit('hits-amazing-grace', AMAZING_GRACE, 88, 'waltz', 'Big, singing leaps.', 13, [3, 4]),
+    hit('hits-greensleeves', GREENSLEEVES, 92, 'waltz', 'Minor key, two black keys.', 14, [3, 4]),
+    hit('hits-fur-elise', FUR_ELISE, 92, 'gentle', 'The most famous opening in piano music.', 15, [3, 4]),
   ],
 };

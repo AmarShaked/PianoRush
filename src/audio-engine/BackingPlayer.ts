@@ -1,7 +1,7 @@
 import type { GameEngine } from '../game-engine/GameEngine';
 import { chordAt, parseChord } from '../song-content/chords';
 import type { CompiledSong } from '../song-content/compile';
-import { arrange, padVoicing, type BackingNote } from './arranger';
+import { arrange, padVoicing, registersFor, type BackingNote } from './arranger';
 import type { AudioEngine } from './AudioEngine';
 import { notesInWindow, notesSoundingAt } from './schedule';
 
@@ -100,7 +100,7 @@ export class BackingPlayer {
       // Discover: keep the current harmony softly in the air while the song waits.
       const beat = this.game.songTimeAt(this.now()) / this.song.msPerBeat;
       const chord = parseChord(chordAt(this.song.definition.backing.chords, Math.max(0, beat)) ?? 'C');
-      if (chord) this.stopSustain = this.audio.sustainChord(padVoicing(chord));
+      if (chord) this.stopSustain = this.audio.sustainChord(padVoicing(chord, registersFor(this.song.definition.lanes).chordBase));
     }
   }
 }

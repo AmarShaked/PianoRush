@@ -179,6 +179,7 @@ kbd {
   background: #f0f0fa; color: #1b1b2b; box-shadow: 0 3px 0 #9a9ab8;
 }
 .keycap small { color: var(--muted); font-size: 0.72rem; }
+.keymap-more { margin-top: 8px; }
 .settings { margin: 12px 0; }
 .settings summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
 

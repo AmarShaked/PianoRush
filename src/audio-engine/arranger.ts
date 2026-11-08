@@ -2,7 +2,7 @@ import { chordAt, parseChord, type Chord } from '../song-content/chords';
 import type { CompiledSong } from '../song-content/compile';
 import type { BackingStyle } from '../song-content/schema';
 
-export type BackingPart = 'kick' | 'snare' | 'clap' | 'hat' | 'openhat' | 'crash' | 'bass' | 'synthbass' | 'pad' | 'keys' | 'click';
+export type BackingPart = 'kick' | 'snare' | 'clap' | 'hat' | 'openhat' | 'crash' | 'bass' | 'synthbass' | 'pad' | 'keys' | 'lead' | 'click';
 
 /** One accompaniment event in musical time. Pitched parts carry a MIDI note. */
 export interface BackingNote {
@@ -21,16 +21,40 @@ export interface ArrangeOptions {
   readonly metronome?: boolean;
 }
 
-/** Highest MIDI note any accompaniment part may use: everything stays below middle C (the melody). */
+/** Highest MIDI note of the default accompaniment register (just below middle C). */
 export const ACCOMPANIMENT_CEILING = 59;
 
-/** Close-position chord voicing in C3–B3 (below the melody register). */
-export function padVoicing(chord: Chord): number[] {
-  return chord.pitchClasses.map((pc) => 48 + pc).sort((a, b) => a - b);
+/**
+ * Registers the band uses for a song, chosen so no pitched backing part ever
+ * enters the range of the player's lanes (the band never doubles the player):
+ *  - chords (pads / keys) in C3–B3 when the player is above it, otherwise in
+ *    the first free octave above the player;
+ *  - bass in C2–B2, or an octave lower if the player plays down there.
+ */
+export interface Registers {
+  readonly chordBase: number;
+  readonly bassBase: number;
+  /** Lowest MIDI note the player uses. */
+  readonly playerLow: number;
+  readonly playerHigh: number;
 }
 
-export function bassRoot(chord: Chord): number {
-  return 36 + chord.root;
+export function registersFor(lanes: readonly number[]): Registers {
+  const lo = Math.min(...lanes);
+  const hi = Math.max(...lanes);
+  let chordBase = 48;
+  while (!(chordBase + 11 < lo || chordBase > hi)) chordBase += 12;
+  const bassBase = lo > 47 ? 36 : 24;
+  return { chordBase, bassBase, playerLow: lo, playerHigh: hi };
+}
+
+/** Close-position chord voicing in one octave starting at `base` (C3–B3 by default). */
+export function padVoicing(chord: Chord, base = 48): number[] {
+  return chord.pitchClasses.map((pc) => base + pc).sort((a, b) => a - b);
+}
+
+export function bassRoot(chord: Chord, base = 36): number {
+  return base + chord.root;
 }
 
 /**
@@ -56,18 +80,28 @@ export function arrange(song: CompiledSong, options: ArrangeOptions = {}): Backi
   const spec = def.backing;
   if (!spec) return sortNotes(out);
 
+  const reg = registersFor(def.lanes);
+  const omit = new Set(spec.omit ?? []);
   const chords = spec.chords;
   const chordOf = (beat: number): Chord => parseChord(chordAt(chords, beat) ?? 'C') ?? parseChord('C')!;
   const lastStart = song.notes[song.notes.length - 1]?.startBeat ?? 0;
   const endingStart = Math.floor(lastStart / bpb + 1e-9) * bpb;
 
+  // Lead melody (the band plays the tune while the player accompanies), placed above the player.
+  if (spec.lead?.length) {
+    const leadLow = Math.min(...spec.lead.map((n) => n.midi));
+    let shift = 0;
+    while (leadLow + shift <= reg.playerHigh) shift += 12;
+    for (const n of spec.lead) out.push({ part: 'lead', beat: n.startBeat, durationBeats: n.durationBeats, velocity: 0.55, midi: n.midi + shift });
+  }
+
   // Pads: one sustained voicing per chord segment (styles that use pads).
-  if (spec.style !== 'gentle') {
+  if (spec.style !== 'gentle' && !omit.has('pad') && !spec.lead?.length) {
     const level = spec.style === 'groove' ? 0.16 : spec.style === 'dance' ? 0.14 : 0.2;
     chords.forEach(([start, symbol], i) => {
       const end = Math.min(chords[i + 1]?.[0] ?? endBeat, endingStart);
       if (start >= end) return;
-      for (const midi of padVoicing(parseChord(symbol)!)) out.push({ part: 'pad', beat: start, durationBeats: end - start, velocity: level, midi });
+      for (const midi of padVoicing(parseChord(symbol)!, reg.chordBase)) out.push({ part: 'pad', beat: start, durationBeats: end - start, velocity: level, midi });
     });
   }
 
@@ -82,7 +116,7 @@ export function arrange(song: CompiledSong, options: ArrangeOptions = {}): Backi
     for (let pos = 0; pos < bpb; pos++) {
       const beat = bar * bpb + pos;
       const changed = chords.some(([b]) => b === beat) && pos !== 0;
-      pattern(spec.style, out, beat, pos, bpb, chordOf, changed);
+      pattern(spec.style, out, beat, pos, bpb, chordOf, changed, reg);
     }
   }
 
@@ -91,10 +125,15 @@ export function arrange(song: CompiledSong, options: ArrangeOptions = {}): Backi
   const len = endBeat - endingStart;
   out.push({ part: 'kick', beat: endingStart, durationBeats: 0.5, velocity: 0.9 });
   if (spec.style === 'pop' || spec.style === 'dance') out.push({ part: 'crash', beat: endingStart, durationBeats: 4, velocity: 0.8 });
-  out.push({ part: 'bass', beat: endingStart, durationBeats: len, velocity: 0.75, midi: bassRoot(finalChord) });
-  for (const midi of padVoicing(finalChord)) out.push({ part: 'pad', beat: endingStart, durationBeats: len, velocity: 0.28, midi });
+  out.push({ part: 'bass', beat: endingStart, durationBeats: len, velocity: 0.75, midi: bassRoot(finalChord, reg.bassBase) });
+  if (!spec.lead?.length) {
+    for (const midi of padVoicing(finalChord, reg.chordBase)) out.push({ part: 'pad', beat: endingStart, durationBeats: len, velocity: 0.28, midi });
+  }
 
-  return sortNotes(out);
+  // Parts the player covers are left out entirely.
+  const dropped = (n: BackingNote) =>
+    (omit.has('bass') && (n.part === 'bass' || n.part === 'synthbass')) || (omit.has('keys') && n.part === 'keys') || (omit.has('pad') && n.part === 'pad');
+  return sortNotes(out.filter((n) => !dropped(n)));
 }
 
 function pattern(
@@ -105,10 +144,13 @@ function pattern(
   bpb: number,
   chordOf: (beat: number) => Chord,
   chordChangedHere: boolean,
+  reg: Registers,
 ): void {
   const chord = chordOf(beat);
-  const root = bassRoot(chord);
-  const fifth = root + 7 <= ACCOMPANIMENT_CEILING ? root + 7 : root - 5;
+  const root = bassRoot(chord, reg.bassBase);
+  const fifth = root + 7 < reg.playerLow ? root + 7 : root - 5;
+  const octaveUp = (m: number) => (m + 12 < reg.playerLow ? m + 12 : m);
+  const voicing = (c: Chord) => padVoicing(c, reg.chordBase);
   const mid = Math.floor(bpb / 2);
   const push = (n: BackingNote) => out.push(n);
 
@@ -120,9 +162,9 @@ function pattern(
       push({ part: 'bass', beat, durationBeats: Math.min(len, nextChangeDistance(chordOf, beat, pos === 0 ? mid : bpb - pos)), velocity: 0.6, midi: pos === mid && !chordChangedAt(chordOf, beat) ? fifth : root });
     }
     // Broken-chord arpeggio: root, third, fifth, third.
-    const voicing = padVoicing(chord);
+    const v = voicing(chord);
     const idx = [0, 1, 2, 1][pos % 4] ?? 0;
-    push({ part: 'keys', beat, durationBeats: 1, velocity: 0.32, midi: voicing[Math.min(idx, voicing.length - 1)] });
+    push({ part: 'keys', beat, durationBeats: 1, velocity: 0.32, midi: v[Math.min(idx, v.length - 1)] });
     return;
   }
 
@@ -143,7 +185,7 @@ function pattern(
       const barIndex = Math.floor(beat / bpb);
       push({ part: 'bass', beat, durationBeats: 0.95, velocity: 0.7, midi: barIndex % 2 && !chordChangedAt(chordOf, beat) ? fifth : root });
     } else {
-      for (const midi of padVoicing(chord)) push({ part: 'keys', beat, durationBeats: 0.6, velocity: 0.26, midi });
+      for (const midi of voicing(chord)) push({ part: 'keys', beat, durationBeats: 0.6, velocity: 0.26, midi });
     }
     push({ part: 'hat', beat, durationBeats: 0.25, velocity: pos === 0 ? 0.2 : 0.12 });
     return;
@@ -157,9 +199,10 @@ function pattern(
     push({ part: 'hat', beat, durationBeats: 0.25, velocity: 0.12 });
     push({ part: 'openhat', beat: beat + 0.5, durationBeats: 0.5, velocity: 0.32 });
     const offChord = chordOf(beat + 0.5);
-    push({ part: 'synthbass', beat: beat + 0.5, durationBeats: 0.42, velocity: 0.75, midi: bassRoot(offChord) + (pos === bpb - 1 ? 12 : 0) });
+    const offRoot = bassRoot(offChord, reg.bassBase);
+    push({ part: 'synthbass', beat: beat + 0.5, durationBeats: 0.42, velocity: 0.75, midi: pos === bpb - 1 ? octaveUp(offRoot) : offRoot });
     if (pos === 1 || pos === 3) {
-      for (const midi of padVoicing(chordOf(beat + 0.5))) push({ part: 'keys', beat: beat + 0.5, durationBeats: 0.3, velocity: 0.28, midi });
+      for (const midi of voicing(chordOf(beat + 0.5))) push({ part: 'keys', beat: beat + 0.5, durationBeats: 0.3, velocity: 0.28, midi });
     }
     return;
   }
@@ -176,7 +219,7 @@ function pattern(
     push({ part: 'hat', beat: beat + 0.5, durationBeats: 0.25, velocity: 0.15 });
     for (const off of [0, 0.5]) {
       const c = chordOf(beat + off);
-      push({ part: 'bass', beat: beat + off, durationBeats: 0.45, velocity: off ? 0.5 : 0.65, midi: bassRoot(c) });
+      push({ part: 'bass', beat: beat + off, durationBeats: 0.45, velocity: off ? 0.5 : 0.65, midi: bassRoot(c, reg.bassBase) });
     }
     return;
   }
@@ -195,13 +238,13 @@ function pattern(
   };
   const g = chordChangedHere ? ([0, 1, 'root'] as const) : groove[pos];
   if (g) {
-    const midi = g[2] === 'root' ? root : g[2] === 'fifth' ? fifth : Math.min(root + 12, ACCOMPANIMENT_CEILING);
+    const midi = g[2] === 'root' ? root : g[2] === 'fifth' ? fifth : octaveUp(root);
     push({ part: 'bass', beat: beat + g[0], durationBeats: g[1], velocity: 0.7, midi });
   }
   if (pos === 1) push({ part: 'bass', beat: beat + 0.5, durationBeats: 0.5, velocity: 0.55, midi: root });
   if (pos === 0 || pos === mid) {
     // Off-beat chord stabs.
-    for (const midi of padVoicing(chordOf(beat + 0.5))) push({ part: 'keys', beat: beat + 0.5, durationBeats: 0.4, velocity: 0.3, midi });
+    for (const midi of voicing(chordOf(beat + 0.5))) push({ part: 'keys', beat: beat + 0.5, durationBeats: 0.4, velocity: 0.3, midi });
   }
 }
 

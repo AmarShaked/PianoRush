@@ -43,6 +43,13 @@ describe('KeyboardSimulator', () => {
     expect(events).toHaveLength(1);
   });
 
+  it('covers three octaves plus black keys in the DAW layout', () => {
+    for (const [code, note] of [['KeyZ', 48], ['KeyM', 59], ['KeyK', 72], ['Quote', 77], ['KeyW', 61], ['KeyU', 70], ['KeyP', 75]] as const) {
+      target.key('keydown', code, 400);
+      expect(events.at(-1)?.note).toBe(note);
+    }
+  });
+
   it('ignores unmapped keys, modifier chords and typing in form fields', () => {
     target.key('keydown', 'KeyQ', 400);
     target.key('keydown', 'KeyA', 400, { metaKey: true });
@@ -53,7 +60,7 @@ describe('KeyboardSimulator', () => {
 
   it('prevents default browser behaviour for mapped keys only', () => {
     expect(target.key('keydown', 'KeyA', 400)).toBe(true);
-    expect(target.key('keydown', 'KeyZ', 400)).toBe(false);
+    expect(target.key('keydown', 'Digit1', 400)).toBe(false);
   });
 
   it('releases all held keys when the window loses focus', () => {

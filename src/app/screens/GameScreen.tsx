@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameResults, GameState } from '../../game-engine/GameEngine';
 import type { GameRenderer, LaneInfo } from '../../game-renderer/GameRenderer';
-import { DEFAULT_KEY_MAP } from '../../piano-input/KeyboardSimulator';
-import { MIDDLE_C, midiToNoteName, midiToPitchClass } from '../../piano-input/noteNames';
+import { DEFAULT_KEY_MAP, keyLabel } from '../../piano-input/KeyboardSimulator';
+import { isBlackKey, MIDDLE_C, midiToNoteName, midiToPitchClass } from '../../piano-input/noteNames';
 import type { PianoInputSource } from '../../piano-input/types';
 import type { CompiledSong } from '../../song-content/compile';
 import type { GameMode, LevelDefinition } from '../../song-content/level';
@@ -27,7 +27,7 @@ interface GameScreenProps {
   onQuit: () => void;
 }
 
-const KEY_HINTS = new Map(Object.entries(DEFAULT_KEY_MAP).map(([code, note]) => [note, code.replace('Key', '')]));
+const KEY_HINTS = new Map(Object.entries(DEFAULT_KEY_MAP).map(([code, note]) => [note, keyLabel(code)]));
 const HUD_HEIGHT = 64;
 /** `?debug` in the URL shows an FPS / timing readout for real-device testing. */
 const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
@@ -70,12 +70,22 @@ export function GameScreen({ level, song, mode, speed, inputs, settings, virtual
     let cancelled = false;
     let finishTimer: number | undefined;
 
-    const lanes: LaneInfo[] = def.lanes.map((midi) => ({
+    // Lane info from the song: spelling, black keys, which hand plays each lane
+    // (majority of its notes), finger guidance and a landmark for low C.
+    const handOf = (midi: number) => {
+      const ns = def.notes.filter((n) => n.midi === midi);
+      return ns.filter((n) => n.hand === 'left').length > ns.length / 2 ? ('left' as const) : ('right' as const);
+    };
+    const lanes: LaneInfo[] = def.lanes.map((midi, i) => ({
       midi,
-      noteName: midiToNoteName(midi),
-      pitchClass: midiToPitchClass(midi),
+      noteName: midiToNoteName(midi, def.preferFlats),
+      pitchClass: midiToPitchClass(midi, def.preferFlats),
       keyHint: settings.keyboardSimulator ? KEY_HINTS.get(midi) : undefined,
       isMiddleC: midi === MIDDLE_C,
+      isBlack: isBlackKey(midi),
+      hand: handOf(midi),
+      finger: settings.showFingers ? (def.fingers?.[i] ?? undefined) : undefined,
+      badge: midi === 48 && !def.lanes.includes(MIDDLE_C) ? 'LOW C' : undefined,
     }));
 
     const offEngine = session.engine.on((e) => {
@@ -163,7 +173,7 @@ export function GameScreen({ level, song, mode, speed, inputs, settings, virtual
 
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      if (e.code === 'Escape' || e.code === 'KeyP') {
+      if (e.code === 'Escape') {
         e.preventDefault();
         const st = session.engine.currentState;
         if (st === 'paused') session.resume();
@@ -285,7 +295,7 @@ export function GameScreen({ level, song, mode, speed, inputs, settings, virtual
                 Quit to menu
               </button>
             </div>
-            <p className="small muted">Esc / P: resume · R: restart</p>
+            <p className="small muted">Esc: resume · R: restart</p>
           </div>
         </div>
       )}

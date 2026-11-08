@@ -1,4 +1,4 @@
-import { DEFAULT_KEY_MAP } from '../../piano-input/KeyboardSimulator';
+import { DEFAULT_KEY_MAP, keyLabel } from '../../piano-input/KeyboardSimulator';
 import { midiToNoteName } from '../../piano-input/noteNames';
 import type { useMidi } from '../useMidi';
 
@@ -8,7 +8,9 @@ interface InputPanelProps {
   onKeyboardSimulatorChange: (enabled: boolean) => void;
 }
 
-const SIM_KEYS = Object.entries(DEFAULT_KEY_MAP).map(([code, note]) => [code.replace('Key', ''), midiToNoteName(note)] as const);
+const SIM_KEYS = Object.entries(DEFAULT_KEY_MAP)
+  .filter(([, note]) => note >= 60 && note <= 69 && ![61, 63, 66, 68].includes(note))
+  .map(([code, note]) => [keyLabel(code), midiToNoteName(note)] as const);
 
 export function InputPanel({ midi, keyboardSimulator, onKeyboardSimulatorChange }: InputPanelProps) {
   const connectedDevices = midi.devices.filter((d) => d.connected);
@@ -99,6 +101,9 @@ export function InputPanel({ midi, keyboardSimulator, onKeyboardSimulatorChange 
             </span>
           ))}
         </div>
+        <p className="small muted keymap-more">
+          More: <b>J K L ; '</b> = B4–F5 · black keys on <b>W E T Y U O P</b> · left hand <b>Z X C V B N M</b> = C3–B3
+        </p>
       </section>
     </div>
   );

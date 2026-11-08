@@ -2,15 +2,26 @@ import { Emitter } from './Emitter';
 import { HeldNotesTracker } from './HeldNotesTracker';
 import type { PianoEvent, PianoEventListener, PianoInputSource, Unsubscribe } from './types';
 
-/** Default computer-keyboard mapping (KeyboardEvent.code → MIDI note). */
+/**
+ * Default computer-keyboard mapping (KeyboardEvent.code → MIDI note), in the
+ * common DAW layout: the home row is the white keys from middle C, the row
+ * above holds the black keys, and the bottom row is the octave below (left hand).
+ */
 export const DEFAULT_KEY_MAP: Readonly<Record<string, number>> = {
-  KeyA: 60, // C4
-  KeyS: 62, // D4
-  KeyD: 64, // E4
-  KeyF: 65, // F4
-  KeyG: 67, // G4
-  KeyH: 69, // A4 (six-key songs)
+  // Left hand: C3–B3
+  KeyZ: 48, KeyX: 50, KeyC: 52, KeyV: 53, KeyB: 55, KeyN: 57, KeyM: 59,
+  // Right hand white keys: C4–F5
+  KeyA: 60, KeyS: 62, KeyD: 64, KeyF: 65, KeyG: 67, KeyH: 69, KeyJ: 71, KeyK: 72, KeyL: 74, Semicolon: 76, Quote: 77,
+  // Black keys: C#4 D#4 · F#4 G#4 A#4 · C#5 D#5
+  KeyW: 61, KeyE: 63, KeyT: 66, KeyY: 68, KeyU: 70, KeyO: 73, KeyP: 75,
 };
+
+/** Printable key cap for a KeyboardEvent.code. */
+export function keyLabel(code: string): string {
+  if (code === 'Semicolon') return ';';
+  if (code === 'Quote') return "'";
+  return code.replace('Key', '');
+}
 
 /** Structural subset of KeyboardEvent we rely on. */
 export interface KeyboardEventLike {

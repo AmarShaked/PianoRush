@@ -35,6 +35,30 @@ describe('arrange', () => {
     expect(notes.filter((n) => n.part === 'click' && n.beat >= 0 && n.accent).map((n) => n.beat)).toEqual([0, 4, 8, 12]);
   });
 
+  it('keeps the band out of the player\'s register for low (left-hand) and wide (two-hand) songs', () => {
+    for (const lanes of [[48, 50, 52, 53, 55], [48, 50, 52, 53, 55, 60, 62, 64, 65, 67], [59, 60, 62, 64, 65, 67, 69]]) {
+      for (const style of ['gentle', 'straight', 'groove', 'pop', 'dance', 'waltz'] as const) {
+        const s = compileSong({ ...song(style).definition, lanes, notes: lanes.map((m, i) => ({ midi: m, startBeat: i, durationBeats: 1 })) });
+        const pitched = arrange(s).filter((n) => n.midi !== undefined);
+        const lo = Math.min(...lanes);
+        const hi = Math.max(...lanes);
+        expect(pitched.filter((n) => n.midi! >= lo && n.midi! <= hi)).toEqual([]);
+      }
+    }
+  });
+
+  it('plays a lead melody above the player and drops omitted parts', () => {
+    const base = song('pop').definition;
+    const s = compileSong({
+      ...base,
+      backing: { ...base.backing!, lead: [{ midi: 64, startBeat: 0, durationBeats: 1 }, { midi: 67, startBeat: 1, durationBeats: 1 }], omit: ['bass'] },
+    });
+    const notes = arrange(s);
+    expect(notes.filter((n) => n.part === 'lead').map((n) => n.midi)).toEqual([76, 79]);
+    expect(notes.filter((n) => n.part === 'bass' || n.part === 'synthbass')).toEqual([]);
+    expect(notes.filter((n) => n.part === 'pad')).toEqual([]); // the lead replaces the pads
+  });
+
   it('never plays in the melody register (no pitched part reaches middle C)', () => {
     for (const style of ['gentle', 'straight', 'groove', 'pop', 'dance', 'waltz'] as const) {
       const pitched = arrange(song(style)).filter((n) => n.midi !== undefined);

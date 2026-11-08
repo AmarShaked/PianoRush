@@ -1,5 +1,6 @@
 import type { LevelDefinition, WorldDefinition } from '../level';
 import { sequence, type Step } from '../notation';
+import { fiveFingerFingering } from '../parts';
 import { SONG_SCHEMA_VERSION, type SongDefinition } from '../schema';
 import { starlightSteps } from '../songs/starlightSteps';
 import { AU_CLAIR, JINGLE_BELLS, ODE_TO_JOY, SAINTS, type PublicDomainTune } from '../songs/publicDomain';
@@ -50,6 +51,7 @@ function song(
     notes: sequence(steps),
     // Levels 1–5 teach pitch only: nothing is a hold tile.
     holdMinBeats: extra.holdMinBeats ?? 99,
+    fingers: fiveFingerFingering(lanes, 'right', 60),
     backing,
     ...(extra.assist ? { assist: extra.assist } : {}),
   };

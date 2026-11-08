@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { chordAt, compileSong, HITS, isChordTone, parseChord, validateSong, WORLD_1, WORLD_2 } from './index';
+import { chordAt, compileSong, HITS, isChordTone, parseChord, validateSong, WORLD_1, WORLD_2, WORLD_3 } from './index';
+import type { LevelDefinition } from './level';
 
 const levels = WORLD_1.levels;
 
@@ -100,7 +101,7 @@ describe('song compilation: events and holds', () => {
   });
 });
 
-const allSongs = [...levels, ...WORLD_2.levels, ...HITS.levels];
+const allSongs = [...levels, ...WORLD_2.levels, ...WORLD_3.levels, ...HITS.levels];
 
 describe('World 1 and Hits accompaniment', () => {
   it.each(allSongs.map((l) => [l.id, l] as const))('%s has a valid backing that covers the whole song', (_, level) => {
@@ -135,8 +136,15 @@ describe('World 1 and Hits accompaniment', () => {
     expect(clashes).toEqual([]);
   });
 
-  it('ends every song on a C major chord', () => {
-    for (const l of allSongs) expect(l.song.backing!.chords.at(-1)![1]).toBe('C');
+  it('every song ends on a tone of its final (tonic) chord', () => {
+    for (const l of allSongs) {
+      const last = [...l.song.notes].sort((a, b) => a.startBeat - b.startBeat).at(-1)!;
+      expect(isChordTone(parseChord(l.song.backing!.chords.at(-1)![1])!, last.midi)).toBe(true);
+    }
+  });
+
+  it('finger numbers, when given, match the lanes one-to-one', () => {
+    for (const l of allSongs) if (l.song.fingers) expect(l.song.fingers).toHaveLength(l.song.lanes.length);
   });
 });
 
@@ -164,6 +172,7 @@ describe('Hits (free play)', () => {
     expect(HITS.levels.map((l) => l.title)).toEqual([
       'Ode to Joy', 'Jingle Bells', 'When the Saints Go Marching In', 'Au Clair de la Lune', 'Mary Had a Little Lamb', 'Twinkle Twinkle Little Star',
       'London Bridge', 'Lightly Row', 'Go Tell Aunt Rhody', 'Hot Cross Buns',
+      'Joy to the World', "Brahms' Lullaby", 'Amazing Grace', 'Greensleeves', 'Für Elise',
     ]);
     for (const l of HITS.levels) expect(l.song.composer).toMatch(/public domain/);
   });
@@ -173,17 +182,18 @@ describe('Hits (free play)', () => {
     for (const l of HITS.levels) expect(w1.has(l.id)).toBe(false);
   });
 
-  it.each(HITS.levels.map((l) => [l.title, l] as const))('%s is valid, 30–60 s, uses every lane and ends on C', (_, level) => {
+  it.each(HITS.levels.map((l) => [l.title, l] as const))('%s is valid, 30–60 s and uses every lane', (_, level) => {
     expect(validateSong(level.song)).toEqual({ valid: true, errors: [] });
     const song = compileSong(level.song);
     expect(song.endMs / 1000).toBeGreaterThanOrEqual(30);
     expect(song.endMs / 1000).toBeLessThanOrEqual(60);
     expect(new Set(song.notes.map((n) => n.midi))).toEqual(new Set(level.song.lanes));
-    expect(song.notes.at(-1)?.midi).toBe(60);
   });
 
-  it('every song fits the keyboard simulator (C4–A4: A S D F G H)', () => {
-    for (const l of HITS.levels) for (const m of l.song.lanes) expect([60, 62, 64, 65, 67, 69]).toContain(m);
+  it('every song fits the keyboard simulator', async () => {
+    const { DEFAULT_KEY_MAP } = await import('../piano-input/KeyboardSimulator');
+    const mapped = new Set(Object.values(DEFAULT_KEY_MAP));
+    for (const l of [...HITS.levels, ...WORLD_3.levels]) for (const m of l.song.lanes) expect(mapped.has(m)).toBe(true);
   });
 });
 
@@ -236,5 +246,57 @@ describe('World 2 — Rhythm Road', () => {
   it('uses public-domain tunes for levels 2, 4 and 8', () => {
     expect([1, 3, 7].map((i) => w2[i]!.song.title)).toEqual(['Lightly Row', 'Hot Cross Buns', 'Go Tell Aunt Rhody']);
     for (const i of [1, 3, 7]) expect(w2[i]!.song.composer).toMatch(/public domain/);
+  });
+});
+
+/** Shared checks for every path world. */
+function pathWorldBasics(levels: readonly LevelDefinition[]) {
+  it.each(levels.map((l) => [l.title, l] as const))('%s is valid, 30–60 s and uses every lane', (_, level) => {
+    expect(validateSong(level.song)).toEqual({ valid: true, errors: [] });
+    const song = compileSong(level.song);
+    expect(song.endMs / 1000).toBeGreaterThanOrEqual(30);
+    expect(song.endMs / 1000).toBeLessThanOrEqual(60);
+    expect(new Set(song.notes.map((n) => n.midi))).toEqual(new Set(level.song.lanes));
+  });
+}
+
+describe('World 3 — Melody Mountain', () => {
+  const w3 = WORLD_3.levels;
+  pathWorldBasics(w3);
+  const black = (m: number) => [1, 3, 6, 8, 10].includes(m % 12);
+
+  it('is ten levels, right hand, with growing range', () => {
+    expect(w3.map((l) => l.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(w3[0]!.song.lanes).toHaveLength(6);
+    expect(Math.max(...w3[1]!.song.lanes) - Math.min(...w3[1]!.song.lanes)).toBe(12); // full octave
+  });
+
+  it('introduces black keys only from level 6, one more at a time', () => {
+    const blacks = w3.map((l) => l.song.lanes.filter(black).length);
+    expect(blacks.slice(0, 5)).toEqual([0, 0, 0, 0, 0]);
+    expect(blacks[5]).toBe(1); // Bb
+    expect(blacks[6]).toBe(1); // F#
+    expect(blacks[7]).toBe(2); // F#, G#
+    expect(blacks[9]).toBe(2); // D#, G#
+    expect(w3[5]!.song.preferFlats).toBe(true);
+  });
+
+  it('has real jumps in the Big Jumps level', () => {
+    const notes = compileSong(w3[3]!.song).notes;
+    const leaps = notes.slice(1).filter((n, i) => Math.abs(n.midi - notes[i]!.midi) >= 4).length;
+    expect(leaps).toBeGreaterThan(6);
+  });
+
+  it('the hand-shift level spends whole phrases in G position', () => {
+    const notes = compileSong(w3[4]!.song).notes;
+    const phrase2 = notes.filter((n) => n.startBeat >= 16 && n.startBeat < 32);
+    expect(phrase2.every((n) => n.midi >= 67)).toBe(true);
+  });
+
+  it('the memory level fades exact repeats', () => {
+    const notes = compileSong(w3[8]!.song).notes;
+    const slice = (from: number, to: number) => notes.filter((n) => n.startBeat >= from && n.startBeat < to).map((n) => [n.midi, n.durationBeats, n.startBeat - from]);
+    expect(slice(16, 32)).toEqual(slice(0, 16));
+    expect(slice(48, 64)).toEqual(slice(32, 48));
   });
 });

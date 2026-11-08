@@ -1,5 +1,6 @@
 import type { LevelDefinition, WorldDefinition } from '../level';
 import { sequence, type Step } from '../notation';
+import { fiveFingerFingering } from '../parts';
 import { SONG_SCHEMA_VERSION, type BackingSpec, type SongDefinition } from '../schema';
 import { AUNT_RHODY, HOT_CROSS_BUNS, LIGHTLY_ROW, type PublicDomainTune } from '../songs/publicDomain';
 
@@ -38,6 +39,7 @@ function song(
     timeSignature: extra.timeSignature ?? [4, 4],
     countInBeats: extra.countInBeats ?? 4,
     lanes: extra.lanes ?? FIVE,
+    fingers: fiveFingerFingering(extra.lanes ?? FIVE, 'right', 60),
     notes: sequence(steps),
     holdMinBeats: 1.5,
     backing,

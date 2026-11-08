@@ -24,6 +24,8 @@ export interface Settings {
   practiceSpeed: number;
   /** Letters on the falling tiles. */
   showNoteLabels: boolean;
+  /** Finger numbers on the key strip (finger guidance). */
+  showFingers: boolean;
   /** First-launch setup completed (or skipped). */
   onboarded: boolean;
 }
@@ -60,6 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
   metronome: false,
   practiceSpeed: 1,
   showNoteLabels: true,
+  showFingers: true,
   onboarded: false,
 };
 

@@ -40,7 +40,7 @@ export function MiniKeyboard({ from, to, lanes = [], pressed = [], keyHints = {}
       viewBox={`0 -26 ${width} ${H + 30}`}
       role="img"
       aria-label={`Piano keyboard from ${midiToNoteName(from)} to ${midiToNoteName(to)}${
-        lanes.length ? `; game keys: ${lanes.map(midiToNoteName).join(', ')}` : ''
+        lanes.length ? `; game keys: ${lanes.map((m) => midiToNoteName(m)).join(', ')}` : ''
       }`}
     >
       {whites.map((m) => {
