@@ -28,7 +28,14 @@ describe('evaluateRun', () => {
   });
 
   it('Discover is practice: no stars and no unlock', () => {
-    expect(evaluateRun(L1, results(1), 'discover')).toEqual({ mode: 'discover', completed: false, stars: 0, ranked: false });
+    expect(evaluateRun(L1, results(1), 'discover')).toEqual({ mode: 'discover', speed: 1, completed: false, stars: 0, ranked: false });
+  });
+
+  it('slowed-down runs are practice: no stars and no unlock', () => {
+    expect(evaluateRun(L1, results(1), 'flow', 0.75)).toMatchObject({ speed: 0.75, completed: false, stars: 0, ranked: false });
+    const u = applyRun(levels, {}, L1.id, evaluateRun(L1, results(1, 5000), 'flow', 0.5), 5000);
+    expect(u.unlockedNext).toBe(false);
+    expect(u.current.bestScore).toBe(0);
   });
 });
 

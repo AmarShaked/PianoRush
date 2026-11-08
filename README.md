@@ -2,7 +2,7 @@
 
 A rhythm game you play with a **real piano**. Tiles fall toward a hit line in fixed lanes, and each lane is one physical key. You play the key when its tile reaches the line.
 
-Current state: **Milestone 3: audio**, built on M1 (playable prototype) and M2 (World 1 learning path).
+Current state: **Milestone 4: MVP completion**, built on M1 (playable prototype), M2 (World 1 learning path) and M3 (audio).
 
 - **M1** added Web MIDI input, a keyboard simulator, a frame-rate-independent scoring engine and a PixiJS renderer.
 - **M2** adds:
@@ -16,6 +16,11 @@ Current state: **Milestone 3: audio**, built on M1 (playable prototype) and M2 (
   - count-in clicks and an optional metronome;
   - volume controls;
   - tap-along timing calibration.
+- **M4** adds:
+  - a first-launch setup guide;
+  - practice speed;
+  - offline play and installing as an app;
+  - a note-labels setting.
 
 ![Level select with World 1 levels, stars and mode picker](docs/screenshot-home.png)
 
@@ -33,7 +38,16 @@ Open the URL in **desktop Chrome or Edge**. Then either:
 - click **Connect MIDI piano** and choose your keyboard, or
 - leave **Play with keyboard simulator** on and use `A S D F G`.
 
-Pick a level (only level 1 is open at first), choose a mode, and press **Play**.
+On first launch a short **setup guide** walks you through it:
+1. Choose how you'll play: MIDI piano or computer keyboard.
+2. Connect your piano.
+3. **Find your keys:** the game asks for middle C, then D, E, F and G. A wrong key gets a hint, e.g. "That was E4. C4 is 2 white keys to the left", or "right note, one octave too high".
+4. Pick the piano sound, with test buttons.
+5. Optionally calibrate, then start level 1.
+
+You can reopen the guide any time from **Setup guide** on the home screen.
+
+After that: pick a level (only level 1 is open at first), choose a mode and a **speed**, and press **Play**. Full speed earns stars; 75% and 50% are practice runs that slow down the tiles, the judging and the backing together.
 
 ## Commands
 
@@ -44,7 +58,7 @@ Pick a level (only level 1 is open at first), choose a mode, and press **Play**.
 | `npm run test:watch`| Vitest in watch mode                                 |
 | `npm run typecheck` | TypeScript strict type check                         |
 | `npm run build`     | Type check + production build into `dist/`           |
-| `npm run preview`   | Serve the production build locally                   |
+| `npm run preview`   | Serve the production build locally (with the offline service worker) |
 
 Add `?debug` to the URL (e.g. `http://localhost:5173/?debug`) to show an FPS / song-time readout during play.
 
@@ -129,6 +143,12 @@ Completing a level unlocks the next one. Progress, best scores and the chosen mo
 - **Discover:** while the song waits for you, the current chord keeps sounding softly. The groove resumes when you play the note.
 - **Calibration** (Settings → Timing & display → Calibrate timing): tap along to 12 clicks and the game suggests an input offset. It also shows the audio latency your device reports, which is already compensated. If that is high (≥100 ms, typical of Bluetooth), you'll see a warning recommending wired headphones or speakers.
 
+## Offline and install
+
+The production build is **offline-first**. A service worker, generated at build time with no extra dependencies, pre-caches every file on the first visit. That covers the code, the lazily loaded PixiJS chunks, the icons and all songs; the songs are bundled and the backing is synthesized. After one online visit the game runs with no network.
+
+It is also installable: it ships a web app manifest (landscape, fullscreen) and app icons, so the browser can install it as an app. Updates arrive automatically the next time you're online.
+
 ## Connecting a real MIDI piano
 
 1. Connect the piano to the computer, either over USB ("USB to Host" port) or through a USB-MIDI interface. Turn the piano on.
@@ -163,6 +183,7 @@ src/
   song-content/   Versioned beat-based song schema, validation, compilation, level definitions, World 1
   game-renderer/  PixiJS presentation (reads engine snapshots, never drives time)
   audio-engine/   Web Audio: clock mapping, arranger, scheduler, synths, built-in piano, calibration
+  pwa/            Build-time service-worker generator (offline-first)
   app/            React screens, GameSession orchestration, settings persistence
   test/           Shared test helpers and fakes
 docs/
@@ -189,4 +210,5 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, and [docs/MANUA
   - The mapping between the audio and game clocks stays within 0.2 ms of the browser's timestamps (95th percentile).
   - Perceived sync on your speakers still needs a human check (see the checklist).
 - **Not yet verified on a physical MIDI piano or a real GPU.** The MIDI path is covered by unit tests against a faked Web MIDI API and was exercised in headless Chromium with the keyboard simulator. 60 FPS has not been measured on real hardware. The headless test container has no GPU, so software rendering reached only about 13 FPS there. Scoring was identical regardless of frame rate. Use `?debug` and the manual checklist on real devices.
+- **Offline mode only works in the production build** (`npm run build && npm run preview`, or deployed). The dev server doesn't register the service worker.
 - Phones are supported in landscape at a basic level. Portrait shows a "rotate your device" prompt.

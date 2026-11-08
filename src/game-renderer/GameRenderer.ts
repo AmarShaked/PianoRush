@@ -25,6 +25,8 @@ export interface GameRendererOptions {
   readonly lookaheadBeats?: number;
   readonly reducedMotion?: boolean;
   readonly showKeyHints?: boolean;
+  /** Letters on the falling tiles (the key strip is always labelled). */
+  readonly showTileLabels?: boolean;
   /** Pixels at the top covered by the DOM HUD. */
   readonly topInset?: number;
 }
@@ -90,6 +92,7 @@ export class GameRenderer {
       lookaheadBeats: 3,
       reducedMotion: false,
       showKeyHints: true,
+      showTileLabels: true,
       topInset: 0,
       ...options,
     };
@@ -496,7 +499,7 @@ export class GameRenderer {
       }
       g.roundRect(x, top, w, h, radius).stroke({ width: 2, color: shade(color, 0.55), alpha: 0.9 * a });
 
-      if (h >= 24 && a >= 0.6) this.placeLabel(labelIndex++, n, x + w / 2, bottom - Math.min(h, 26) / 2 - 1, layout);
+      if (this.opts.showTileLabels && h >= 24 && a >= 0.6) this.placeLabel(labelIndex++, n, x + w / 2, bottom - Math.min(h, 26) / 2 - 1, layout);
     }
     for (let i = labelIndex; i < this.labelPool.length; i++) this.labelPool[i]!.visible = false;
   }

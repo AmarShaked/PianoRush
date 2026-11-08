@@ -1,4 +1,4 @@
-# Piano Rush — Architecture (Milestones 1–3)
+# Piano Rush — Architecture (Milestones 1–4)
 
 ## Goals that shaped the design
 
@@ -204,6 +204,22 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
 - `GameSession` connects the inputs to the engine. It auto-pauses on device disconnect, exposes `frame()`, and handles `restart()` without reloading. It is unit-tested with a `ManualClock`.
 - `GameScreen` updates the HUD (score, combo, progress) through refs instead of per-frame React renders. It pauses when the tab is hidden, and its hotkeys are Esc/P and R.
 - `storage.ts` persists settings, the last MIDI device and best scores in `localStorage`, and tolerates storage being unavailable.
+
+## MVP completion (M4)
+
+- **Setup guide** (`app/screens/SetupScreen.tsx`, PRD §10): welcome → input method → connect → find your keys → sound → ready. The ready step offers optional calibration, then starts level 1.
+  - It is shown on first launch, controlled by `settings.onboarded`, and can be reopened any time.
+  - The "find your keys" guidance comes from `piano-input/keyFinding.ts` (pure and tested). It works in white keys left/right and octaves up/down.
+- **Practice speed** (PRD §7.4): `songFor(level, speed)` compiles the song at `bpm × speed`.
+  - Beats, lanes and the arrangement are unchanged, so tiles, judgments and the backing all scale together.
+  - `evaluateRun(…, speed)` makes slowed-down runs unranked: no stars, no unlocks.
+- **Offline / installable** (PRD §15): `pwa/serviceWorker.ts` generates `sw.js` at build time through a small Vite plugin in `vite.config.ts`.
+  - **Install:** pre-caches every bundle and public file.
+  - **Hashed assets:** served cache-first, matched with `ignoreVary` because module scripts carry an `Origin` header.
+  - **Page loads:** network-first, falling back to the cached shell.
+  - **Cache versioning:** the cache name comes from the file list, and old caches are deleted on activation.
+  - Registered in production only. The build uses `base: './'`, so it runs from any path.
+- **TypeScript projects:** `tsconfig.app.json` (browser code, no Node types) and `tsconfig.node.json` (build tooling), tied together by `tsc -b`.
 
 ## Extension points (not implemented)
 

@@ -2,7 +2,7 @@ import { DEFAULT_KEY_MAP } from '../../piano-input/KeyboardSimulator';
 import { midiToNoteName } from '../../piano-input/noteNames';
 import { songFor } from '../catalog';
 import { GAME_MODES, type GameMode, type LevelDefinition, type WorldDefinition } from '../../song-content/level';
-import { isLevelUnlocked, totalStars, type ProgressMap } from '../../game-engine/progression';
+import { isLevelUnlocked, PRACTICE_SPEEDS, totalStars, type ProgressMap } from '../../game-engine/progression';
 import { InputPanel } from '../components/InputPanel';
 import { MiniKeyboard } from '../components/MiniKeyboard';
 import { Stars } from '../components/Stars';
@@ -26,6 +26,7 @@ interface HomeScreenProps {
   onPlay: () => void;
   onDiagnostics: () => void;
   onCalibrate: () => void;
+  onSetup: () => void;
 }
 
 const KEY_HINTS: Record<number, string> = Object.fromEntries(
@@ -50,7 +51,7 @@ function Slider({ label, value, onChange }: { label: string; value: number; onCh
 }
 
 export function HomeScreen(props: HomeScreenProps) {
-  const { collections, world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate } = props;
+  const { collections, world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate, onSetup } = props;
   const latency = audioEngine.latency;
   const outputLatencyMs = latency?.output != null ? Math.round(latency.output * 1000) : null;
   const levels = world.levels;
@@ -167,8 +168,25 @@ export function HomeScreen(props: HomeScreenProps) {
               ))}
             </div>
 
+            <div className="speed-picker" role="radiogroup" aria-label="Practice speed">
+              <span className="small muted">Speed</span>
+              {PRACTICE_SPEEDS.map((sp) => (
+                <button
+                  key={sp}
+                  role="radio"
+                  aria-checked={settings.practiceSpeed === sp}
+                  className={`speed-option${settings.practiceSpeed === sp ? ' active' : ''}`}
+                  onClick={() => onSettingsChange({ practiceSpeed: sp })}
+                >
+                  {sp === 1 ? 'Full' : `${sp * 100}%`}
+                </button>
+              ))}
+              {settings.practiceSpeed < 1 && <span className="small muted">practice: no stars</span>}
+            </div>
+
             <button className="btn btn-primary btn-play" onClick={onPlay} disabled={!unlocked || !hasInput}>
               ▶ Play {MODE_LABEL[mode]}
+              {settings.practiceSpeed < 1 ? ` · ${settings.practiceSpeed * 100}%` : ''}
             </button>
             {!unlocked && (
               <p className="small warn-text center">Complete level {selected.number - 1} to unlock this level.</p>
@@ -244,6 +262,10 @@ export function HomeScreen(props: HomeScreenProps) {
               <small className="muted">Increase if hits are judged LATE even when they feel on time.</small>
             </label>
             <label className="toggle">
+              <input type="checkbox" checked={settings.showNoteLabels} onChange={(e) => onSettingsChange({ showNoteLabels: e.target.checked })} />
+              <span>Note letters on tiles</span>
+            </label>
+            <label className="toggle">
               <input type="checkbox" checked={settings.showKeyHints} onChange={(e) => onSettingsChange({ showKeyHints: e.target.checked })} />
               <span>Show keyboard-key hints in game</span>
             </label>
@@ -253,9 +275,14 @@ export function HomeScreen(props: HomeScreenProps) {
             </label>
           </details>
 
-          <button className="btn btn-ghost" onClick={onDiagnostics}>
-            MIDI diagnostics
-          </button>
+          <div className="home-links">
+            <button className="btn btn-ghost" onClick={onSetup}>
+              Setup guide
+            </button>
+            <button className="btn btn-ghost" onClick={onDiagnostics}>
+              MIDI diagnostics
+            </button>
+          </div>
         </section>
       </div>
     </main>

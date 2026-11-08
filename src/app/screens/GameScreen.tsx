@@ -17,6 +17,8 @@ interface GameScreenProps {
   level: LevelDefinition;
   song: CompiledSong;
   mode: GameMode;
+  /** Practice speed (1 = full tempo). */
+  speed: number;
   inputs: readonly PianoInputSource[];
   settings: Settings;
   /** Play the built-in piano for the player's keys (virtual piano mode). */
@@ -33,7 +35,7 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 /** Lead time before the count-in so the first click can be queued on time (plus device latency). */
 const startDelayMs = () => 250 + audioEngine.totalLatency * 1000;
 
-export function GameScreen({ level, song, mode, inputs, settings, virtualPiano, onFinished, onQuit }: GameScreenProps) {
+export function GameScreen({ level, song, mode, speed, inputs, settings, virtualPiano, onFinished, onQuit }: GameScreenProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const scoreRef = useRef<HTMLSpanElement>(null);
   const comboRef = useRef<HTMLSpanElement>(null);
@@ -140,6 +142,7 @@ export function GameScreen({ level, song, mode, inputs, settings, virtualPiano, 
       beatsPerBar: def.timeSignature[0],
       reducedMotion: settings.reducedMotion,
       showKeyHints: settings.keyboardSimulator && settings.showKeyHints,
+      showTileLabels: settings.showNoteLabels,
       topInset: HUD_HEIGHT,
         }),
       )
@@ -203,6 +206,7 @@ export function GameScreen({ level, song, mode, inputs, settings, virtualPiano, 
         <div className="hud-left">
           <div className="hud-title">
             <span className={`mode-badge mode-${mode}`}>{MODE_LABEL[mode]}</span>
+            {speed < 1 && <span className="mode-badge speed-badge">{Math.round(speed * 100)}%</span>}
             {level.world > 0 ? `${level.number}. ` : ''}
             {level.title}
           </div>

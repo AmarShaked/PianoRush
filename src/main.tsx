@@ -16,3 +16,10 @@ createRoot(document.getElementById('root')!).render(
     </div>
   </StrictMode>,
 );
+
+// Offline-first (PRD §15): the service worker caches the whole game after the first visit.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => undefined);
+  });
+}

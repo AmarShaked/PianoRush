@@ -5,6 +5,8 @@ export type StarCount = 0 | 1 | 2 | 3;
 
 export interface RunOutcome {
   readonly mode: GameMode;
+  /** Playback speed factor (1 = full tempo). */
+  readonly speed: number;
   /** Met the level's completion condition (unlocks the next level). */
   readonly completed: boolean;
   readonly stars: StarCount;
@@ -36,15 +38,19 @@ type LevelRules = Pick<LevelDefinition, 'completion' | 'stars'>;
 
 /**
  * PRD §7.3: one star for completing, two at ≥80 % note accuracy, three at ≥95 %
- * (thresholds come from the level). Discover runs are practice: no stars, no unlock.
+ * (thresholds come from the level). Discover runs and slowed-down runs are
+ * practice: no stars, no unlock.
  */
-export function evaluateRun(level: LevelRules, results: GameResults, mode: GameMode): RunOutcome {
-  if (mode === 'discover') return { mode, completed: false, stars: 0, ranked: false };
+export function evaluateRun(level: LevelRules, results: GameResults, mode: GameMode, speed = 1): RunOutcome {
+  if (mode === 'discover' || speed < 1) return { mode, speed, completed: false, stars: 0, ranked: false };
   const acc = results.noteAccuracy;
   const completed = acc >= level.completion.minNoteAccuracy;
   const stars: StarCount = !completed ? 0 : acc >= level.stars.three ? 3 : acc >= level.stars.two ? 2 : 1;
-  return { mode, completed, stars, ranked: true };
+  return { mode, speed, completed, stars, ranked: true };
 }
+
+/** Practice speeds offered in the UI. */
+export const PRACTICE_SPEEDS = [0.5, 0.75, 1] as const;
 
 export interface ProgressUpdate {
   readonly progress: ProgressMap;

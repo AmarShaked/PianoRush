@@ -1,10 +1,23 @@
-# Manual test checklist (M1–M3)
+# Manual test checklist (M1–M4)
 
 Record the browser, OS, piano model and connection type for each run. Tick only what you actually tested.
 
 ## Setup
 - [ ] `npm install && npm run dev` starts without errors
 - [ ] `npm test` passes and `npm run build` succeeds
+
+## First launch (M4)
+- [ ] A fresh browser profile opens the setup guide. "Skip setup" goes to level select and isn't shown again
+- [ ] **MIDI path:** Continue stays disabled until the piano is listening
+- [ ] **Find your keys:** a wrong key gives correct guidance (white keys left or right, or "one octave too high/low"), and all five keys must be found to continue
+- [ ] **Sound step:** "Built-in piano" and "Hear the band" both make sound, and the chosen option is saved
+- [ ] "Calibrate timing first" returns to the guide's last step. "Start Level 1" starts the level
+
+## Practice speed, labels, offline (M4)
+- [ ] The 50% and 75% speeds slow the tiles, judging and backing together. The results say "Practice", with no stars and no unlocks
+- [ ] "Note letters on tiles" hides the tile letters, while the key strip keeps its labels
+- [ ] After `npm run build && npm run preview` and one visit: go offline (DevTools → Network → Offline), reload, and a level still plays with its backing
+- [ ] Chrome offers to install the app. The installed app opens fullscreen in landscape
 
 ## Start screen
 - [ ] The title, song card (tempo, length, notes, best) and the "Find your keys" keyboard with MIDDLE C appear

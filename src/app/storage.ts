@@ -20,6 +20,12 @@ export interface Settings {
   metronomeVolume: number;
   /** Click on every beat during the song (the count-in always clicks). */
   metronome: boolean;
+  /** Tempo factor for the next run (1 = full speed; slower runs are practice). */
+  practiceSpeed: number;
+  /** Letters on the falling tiles. */
+  showNoteLabels: boolean;
+  /** First-launch setup completed (or skipped). */
+  onboarded: boolean;
 }
 
 export type PianoOutput = 'auto' | 'physical' | 'virtual';
@@ -52,6 +58,9 @@ export const DEFAULT_SETTINGS: Settings = {
   pianoVolume: 0.9,
   metronomeVolume: 0.6,
   metronome: false,
+  practiceSpeed: 1,
+  showNoteLabels: true,
+  onboarded: false,
 };
 
 function read(): Stored {

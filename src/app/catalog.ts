@@ -16,12 +16,17 @@ export function collectionOf(level: LevelDefinition): WorldDefinition {
 
 const compiled = new Map<string, CompiledSong>();
 
-/** Validated, compiled song for a level (compiled once, cached). */
-export function songFor(level: LevelDefinition): CompiledSong {
-  let song = compiled.get(level.id);
+/**
+ * Validated, compiled song for a level (compiled once per speed, cached).
+ * Practice speed scales the tempo; beats, lanes and the arrangement are
+ * unchanged, so tiles, judging and the backing all slow down together.
+ */
+export function songFor(level: LevelDefinition, speed = 1): CompiledSong {
+  const key = `${level.id}@${speed}`;
+  let song = compiled.get(key);
   if (!song) {
-    song = compileSong(level.song);
-    compiled.set(level.id, song);
+    song = compileSong(speed === 1 ? level.song : { ...level.song, bpm: level.song.bpm * speed });
+    compiled.set(key, song);
   }
   return song;
 }

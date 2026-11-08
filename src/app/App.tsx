@@ -20,6 +20,7 @@ import { GameScreen } from './screens/GameScreen';
 import { ResultsScreen } from './screens/ResultsScreen';
 import { DiagnosticsScreen } from './screens/DiagnosticsScreen';
 import { CalibrationScreen } from './screens/CalibrationScreen';
+import { SetupScreen, type SetupStep } from './screens/SetupScreen';
 
 const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator];
 const FIRST_LEVEL = LEVELS[0]!;
@@ -31,6 +32,7 @@ type Screen =
       readonly run: number;
       readonly level: LevelDefinition;
       readonly mode: GameMode;
+      readonly speed: number;
       readonly settings: Settings;
       readonly virtualPiano: boolean;
     }
@@ -38,19 +40,22 @@ type Screen =
       readonly name: 'results';
       readonly level: LevelDefinition;
       readonly mode: GameMode;
+      readonly speed: number;
       readonly results: GameResults;
       readonly outcome: RunOutcome;
       readonly update: ProgressUpdate;
     }
   | { readonly name: 'diagnostics' }
-  | { readonly name: 'calibration' };
+  | { readonly name: 'calibration'; readonly returnTo: 'home' | 'setup' }
+  | { readonly name: 'setup'; readonly step: SetupStep };
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [progress, setProgress] = useState<ProgressMap>(loadProgress);
   // Returning players continue where they left off.
   const [selected, setSelected] = useState<LevelDefinition>(() => nextLevelToPlay(LEVELS, loadProgress()) ?? FIRST_LEVEL);
-  const [screen, setScreen] = useState<Screen>({ name: 'home' });
+  // First launch opens the setup guide (PRD §10); returning players go straight to level select.
+  const [screen, setScreen] = useState<Screen>(() => (loadSettings().onboarded ? { name: 'home' } : { name: 'setup', step: 'welcome' }));
   const [run, setRun] = useState(0);
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
@@ -77,27 +82,27 @@ export function App() {
   }, [gameSimEnabled]);
 
   const startLevel = useCallback(
-    (level: LevelDefinition, mode: GameMode) => {
+    (level: LevelDefinition, mode: GameMode, speed: number = settings.practiceSpeed) => {
       // Always called from a click: the moment browsers allow audio to start.
       audioEngine.unlock();
       const virtualPiano = settings.pianoOutput === 'virtual' || (settings.pianoOutput === 'auto' && !midiManager.isListening);
       setSelected(level);
       setRun((r) => r + 1);
       // Settings are frozen for the duration of a run.
-      setScreen({ name: 'game', run: run + 1, level, mode, settings, virtualPiano });
+      setScreen({ name: 'game', run: run + 1, level, mode, speed, settings, virtualPiano });
     },
     [run, settings],
   );
 
   const finish = useCallback(
-    (level: LevelDefinition, mode: GameMode, results: GameResults) => {
-      const outcome = evaluateRun(level, results, mode);
+    (level: LevelDefinition, mode: GameMode, speed: number, results: GameResults) => {
+      const outcome = evaluateRun(level, results, mode, speed);
       // Free-play songs never unlock anything: merge them as a list of one.
       const list = collectionOf(level).kind === 'path' ? collectionOf(level).levels : [level];
       const update = applyRun(list, progress, level.id, outcome, results.score);
       setProgress(update.progress);
       saveProgress(update.progress);
-      setScreen({ name: 'results', level, mode, results, outcome, update });
+      setScreen({ name: 'results', level, mode, speed, results, outcome, update });
     },
     [progress],
   );
@@ -111,12 +116,13 @@ export function App() {
         <GameScreen
           key={screen.run}
           level={screen.level}
-          song={songFor(screen.level)}
+          song={songFor(screen.level, screen.speed)}
           mode={screen.mode}
+          speed={screen.speed}
           inputs={INPUTS}
           settings={screen.settings}
           virtualPiano={screen.virtualPiano}
-          onFinished={(results) => finish(screen.level, screen.mode, results)}
+          onFinished={(results) => finish(screen.level, screen.mode, screen.speed, results)}
           onQuit={toHome}
         />
       );
@@ -134,12 +140,13 @@ export function App() {
           outcome={screen.outcome}
           update={screen.update}
           nextLevel={nextLevel}
-          onRetry={() => startLevel(screen.level, screen.mode)}
-          onPlayMode={(m) => {
-            updateSettings({ preferredMode: m });
-            startLevel(screen.level, m);
+          speed={screen.speed}
+          onRetry={() => startLevel(screen.level, screen.mode, screen.speed)}
+          onPlayMode={(m, sp) => {
+            updateSettings({ preferredMode: m, practiceSpeed: sp });
+            startLevel(screen.level, m, sp);
           }}
-          onNext={() => nextLevel && startLevel(nextLevel, screen.mode === 'discover' ? 'flow' : screen.mode)}
+          onNext={() => nextLevel && startLevel(nextLevel, screen.mode === 'discover' ? 'flow' : screen.mode, 1)}
           onMenu={() => {
             if (screen.update.unlockedNext && nextLevel) setSelected(nextLevel);
             toHome();
@@ -165,9 +172,26 @@ export function App() {
           currentOffsetMs={settings.inputOffsetMs}
           onApply={(offset) => {
             updateSettings({ inputOffsetMs: offset });
-            toHome();
+            setScreen(screen.returnTo === 'setup' ? { name: 'setup', step: 'ready' } : { name: 'home' });
           }}
-          onBack={toHome}
+          onBack={() => setScreen(screen.returnTo === 'setup' ? { name: 'setup', step: 'ready' } : { name: 'home' })}
+        />
+      );
+    case 'setup':
+      return (
+        <SetupScreen
+          key={screen.step}
+          initialStep={screen.step}
+          midi={midi}
+          inputs={INPUTS}
+          settings={settings}
+          onSettingsChange={updateSettings}
+          onCalibrate={() => setScreen({ name: 'calibration', returnTo: 'setup' })}
+          onDone={(startFirst) => {
+            updateSettings({ onboarded: true });
+            if (startFirst) startLevel(FIRST_LEVEL, 'flow', 1);
+            else toHome();
+          }}
         />
       );
     default:
@@ -185,7 +209,8 @@ export function App() {
           onSettingsChange={updateSettings}
           onPlay={() => startLevel(selected, mode)}
           onDiagnostics={() => setScreen({ name: 'diagnostics' })}
-          onCalibrate={() => setScreen({ name: 'calibration' })}
+          onCalibrate={() => setScreen({ name: 'calibration', returnTo: 'home' })}
+          onSetup={() => setScreen({ name: 'setup', step: 'welcome' })}
         />
       );
   }

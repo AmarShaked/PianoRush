@@ -7,12 +7,13 @@ import { MODE_LABEL } from './GameScreen';
 interface ResultsScreenProps {
   level: LevelDefinition;
   mode: GameMode;
+  speed: number;
   results: GameResults;
   outcome: RunOutcome;
   update: ProgressUpdate;
   nextLevel: LevelDefinition | null;
   onRetry: () => void;
-  onPlayMode: (mode: GameMode) => void;
+  onPlayMode: (mode: GameMode, speed: number) => void;
   onNext: () => void;
   onMenu: () => void;
 }
@@ -28,13 +29,14 @@ function offsetAdvice(mean: number | null): string | null {
 }
 
 export function ResultsScreen(props: ResultsScreenProps) {
-  const { level, mode, results, outcome, update, nextLevel, onRetry, onPlayMode, onNext, onMenu } = props;
+  const { level, mode, speed, results, outcome, update, nextLevel, onRetry, onPlayMode, onNext, onMenu } = props;
   const discover = mode === 'discover';
+  const slowed = !discover && speed < 1;
   const advice = discover ? null : offsetAdvice(results.meanOffsetMs);
   const newChallenge = mode === 'challenge' && outcome.completed && !update.previous.challengeCleared;
   const canGoNext = nextLevel !== null && update.current.completed;
 
-  const heading = discover ? 'Practice complete' : !outcome.completed ? 'Keep practising' : level.world > 0 ? 'Level complete' : 'Song complete';
+  const heading = discover || slowed ? 'Practice complete' : !outcome.completed ? 'Keep practising' : level.world > 0 ? 'Level complete' : 'Song complete';
   const rows: Array<[string, number, string]> = [
     ['Perfect', results.counts.perfect, 'perfect'],
     ['Great', results.counts.great, 'great'],
@@ -47,20 +49,21 @@ export function ResultsScreen(props: ResultsScreenProps) {
       <section className="card results-card" aria-labelledby="results-title">
         <div className="eyebrow">
           {heading} · {MODE_LABEL[mode]}
+          {speed < 1 ? ` · ${Math.round(speed * 100)}% speed` : ''}
         </div>
         <h2 id="results-title">{level.world > 0 ? `${level.number}. ${level.title}` : level.title}</h2>
 
-        {!discover && <Stars count={outcome.stars} animate />}
+        {outcome.ranked && <Stars count={outcome.stars} animate />}
 
         <div className="big-score">
           {results.score.toLocaleString()}
           {update.newBestScore && <span className="badge">New best!</span>}
         </div>
-        {!discover && !update.newBestScore && update.previous.bestScore > 0 && (
+        {outcome.ranked && !update.newBestScore && update.previous.bestScore > 0 && (
           <p className="muted small center">Personal best: {update.previous.bestScore.toLocaleString()}</p>
         )}
 
-        {(update.unlockedNext || newChallenge || !outcome.completed) && (
+        {(update.unlockedNext || newChallenge || !outcome.completed || slowed) && (
           <div className="result-messages">
             {update.unlockedNext && nextLevel && (
               <p className="msg ok">
@@ -69,7 +72,8 @@ export function ResultsScreen(props: ResultsScreenProps) {
             )}
             {newChallenge && <p className="msg ok">🏆 Challenge cleared!</p>}
             {discover && <p className="msg">Nice work learning the notes. Try Flow mode to earn stars.</p>}
-            {!discover && !outcome.completed && (
+            {slowed && <p className="msg">Practice at {Math.round(speed * 100)}% speed. Play at full speed to earn stars.</p>}
+            {outcome.ranked && !outcome.completed && (
               <p className="msg warn">
                 Hit at least {Math.round(level.completion.minNoteAccuracy * 100)}% of the notes to complete the level. Discover mode
                 lets you learn them at your own pace.
@@ -128,12 +132,16 @@ export function ResultsScreen(props: ResultsScreenProps) {
               Next: {nextLevel.title} →
             </button>
           )}
-          {discover && (
-            <button className="btn btn-primary" onClick={() => onPlayMode('flow')} autoFocus={!canGoNext}>
-              ▶ Play in Flow mode
+          {(discover || slowed) && (
+            <button className="btn btn-primary" onClick={() => onPlayMode('flow', 1)} autoFocus={!canGoNext}>
+              ▶ Play in Flow mode at full speed
             </button>
           )}
-          <button className={`btn ${canGoNext || discover ? 'btn-secondary' : 'btn-primary'}`} onClick={onRetry} autoFocus={!canGoNext && !discover}>
+          <button
+            className={`btn ${canGoNext || discover || slowed ? 'btn-secondary' : 'btn-primary'}`}
+            onClick={onRetry}
+            autoFocus={!canGoNext && !discover && !slowed}
+          >
             ↻ Play again
           </button>
           <button className="btn btn-ghost" onClick={onMenu}>
