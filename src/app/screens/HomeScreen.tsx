@@ -93,7 +93,13 @@ export function HomeScreen(props: HomeScreenProps) {
                   onSelect(first ?? c.levels[0]!);
                 }}
               >
-                {c.kind === 'path' ? `World ${c.id} · ${c.title}` : `🔥 ${c.title}`}
+                {c.kind === 'path' ? (
+                  <>
+                    <span className="tab-num">{c.id}</span> {c.title}
+                  </>
+                ) : (
+                  `🔥 ${c.title}`
+                )}
               </button>
             ))}
           </div>

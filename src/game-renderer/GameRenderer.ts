@@ -330,7 +330,7 @@ export class GameRenderer {
           anchor: { x: 0.5, y: 1 },
         });
         label.alpha = 0.55;
-        label.position.set(left + ((idx[0]! + idx.at(-1)! + 1) / 2) * laneWidth, layout.keysTop - 4);
+        label.position.set(left + ((idx[0]! + idx.at(-1)! + 1) / 2) * laneWidth, (this.opts.topInset || 0) + 22);
         this.keyLabels.addChild(label);
       }
     }
@@ -343,7 +343,7 @@ export class GameRenderer {
           style: { fontFamily: FONT_FAMILY, fontSize: 13, fontWeight: '900', fill: 0xffffff },
           anchor: 0.5,
         });
-        finger.position.set(cx, layout.keysTop + 22);
+        finger.position.set(cx, layout.keysTop + kh * 0.42 + 2);
         finger.tint = lane.isBlack ? 0xffffff : 0x14142a;
         this.keyLabels.addChild(finger);
       }
@@ -662,7 +662,7 @@ export class GameRenderer {
       const color = laneColor(i);
       g.roundRect(x, y + 4, w, h, 8).fill({ color: COLORS.keyShadow, alpha: pressed ? 0 : 1 });
       g.roundRect(x, y, w, h, 8).fill(pressed ? shade(color, 0.45) : lane.isBlack ? 0x22222e : COLORS.keyWhite);
-      if (lane.finger) g.circle(x + w / 2, keysTop + 22 + (pressed ? 3 : 0), 10).fill({ color: lane.isBlack ? 0x3a3a50 : 0xd8d8e8 });
+      if (lane.finger) g.circle(x + w / 2, keysTop + keysHeight * 0.42 + 2 + (pressed ? 3 : 0), 10).fill({ color: lane.isBlack ? 0x3a3a50 : 0xd8d8e8 });
       g.rect(x, y, w, 5).fill(color);
       if (!pressed && s.waitingFor.includes(lane.midi)) {
         g.roundRect(x + 2, y + 2, w - 4, h - 4, 7).stroke({ width: 4, color });

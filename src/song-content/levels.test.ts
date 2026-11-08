@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chordAt, compileSong, HITS, isChordTone, parseChord, validateSong, WORLD_1, WORLD_2, WORLD_3 } from './index';
+import { chordAt, compileSong, HITS, isChordTone, parseChord, validateSong, WORLD_1, WORLD_2, WORLD_3, WORLD_4, WORLD_5, WORLD_6 } from './index';
 import type { LevelDefinition } from './level';
 
 const levels = WORLD_1.levels;
@@ -101,7 +101,7 @@ describe('song compilation: events and holds', () => {
   });
 });
 
-const allSongs = [...levels, ...WORLD_2.levels, ...WORLD_3.levels, ...HITS.levels];
+const allSongs = [...levels, ...WORLD_2.levels, ...WORLD_3.levels, ...WORLD_4.levels, ...WORLD_5.levels, ...WORLD_6.levels, ...HITS.levels];
 
 describe('World 1 and Hits accompaniment', () => {
   it.each(allSongs.map((l) => [l.id, l] as const))('%s has a valid backing that covers the whole song', (_, level) => {
@@ -298,5 +298,87 @@ describe('World 3 — Melody Mountain', () => {
     const slice = (from: number, to: number) => notes.filter((n) => n.startBeat >= from && n.startBeat < to).map((n) => [n.midi, n.durationBeats, n.startBeat - from]);
     expect(slice(16, 32)).toEqual(slice(0, 16));
     expect(slice(48, 64)).toEqual(slice(32, 48));
+  });
+});
+
+describe('all levels', () => {
+  it('have unique ids across every world and Hits', () => {
+    const ids = allSongs.map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(allSongs.filter((l) => l.world > 0)).toHaveLength(60);
+  });
+});
+
+describe('World 4 — Left Hand Land', () => {
+  const w4 = WORLD_4.levels;
+  pathWorldBasics(w4);
+  it('is all left hand, C3–G3, with 5-4-3-2-1 fingering', () => {
+    for (const l of w4) {
+      expect(l.hand).toBe('left');
+      for (const n of l.song.notes) {
+        expect(n.hand).toBe('left');
+        expect(n.midi).toBeGreaterThanOrEqual(48);
+        expect(n.midi).toBeLessThanOrEqual(55);
+      }
+      const fingerOf = new Map(l.song.lanes.map((m, i) => [m, l.song.fingers![i]]));
+      if (fingerOf.has(48)) expect(fingerOf.get(48)).toBe(5);
+      if (fingerOf.has(55)) expect(fingerOf.get(55)).toBe(1);
+    }
+  });
+  it('the bass-line level drops the band bass (the player is the bass)', () => {
+    expect(w4[6]!.song.backing!.omit).toContain('bass');
+  });
+});
+
+describe('World 5 — Chord City', () => {
+  const w5 = WORLD_5.levels;
+  pathWorldBasics(w5);
+  const eventSizes = (i: number) => compileSong(w5[i]!.song).events.map((e) => e.noteIds.length);
+  it('teaches two-note, then three-note chords, then patterns', () => {
+    expect(eventSizes(0).every((n) => n === 2)).toBe(true);
+    expect(eventSizes(2).some((n) => n === 3)).toBe(true);
+    expect(eventSizes(3).every((n) => n === 3)).toBe(true); // three primary chords, block
+    expect(eventSizes(5).every((n) => n === 1)).toBe(true); // broken chords: one tone at a time
+    expect(compileSong(w5[6]!.song).notes.some((n) => n.durationBeats < 0.5)).toBe(true); // alberti eighths
+  });
+  it('from level 4 the band plays the tune above the player, never in the player range', () => {
+    for (const l of w5.slice(3)) {
+      const lead = l.song.backing!.lead!;
+      expect(lead.length).toBeGreaterThan(10);
+      expect(l.song.backing!.omit).toEqual(['pad', 'keys']);
+    }
+  });
+  it('chord parts stay in the right-hand chord range B3–A4', () => {
+    for (const l of w5) for (const m of l.song.lanes) expect(m >= 59 && m <= 69).toBe(true);
+  });
+});
+
+describe('World 6 — Two Hands Festival', () => {
+  const w6 = WORLD_6.levels;
+  pathWorldBasics(w6);
+  const hands = (i: number) => {
+    const notes = compileSong(w6[i]!.song).notes;
+    const def = w6[i]!.song;
+    const handOf = (m: number) => def.notes.find((n) => n.midi === m)!.hand;
+    return { notes, handOf };
+  };
+  it('uses both hands in every level: left C3–G3, right C4 and up', () => {
+    for (const l of w6) {
+      expect(l.song.notes.some((n) => n.hand === 'left' && n.midi < 60)).toBe(true);
+      expect(l.song.notes.some((n) => n.hand === 'right' && n.midi >= 60)).toBe(true);
+    }
+  });
+  it('level 1 alternates hands (never together); from level 2 the hands overlap', () => {
+    const overlapping = (i: number) => {
+      const { notes, handOf } = hands(i);
+      const left = notes.filter((n) => handOf(n.midi) === 'left');
+      const right = notes.filter((n) => handOf(n.midi) === 'right');
+      return left.some((l) => right.some((r) => r.timeMs < l.timeMs + l.durationMs && l.timeMs < r.timeMs + r.durationMs));
+    };
+    expect(overlapping(0)).toBe(false);
+    for (let i = 1; i < w6.length; i++) expect(overlapping(i)).toBe(true);
+  });
+  it('the band leaves the bass to the player (except call & response)', () => {
+    for (const l of w6.slice(1)) expect(l.song.backing!.omit).toContain('bass');
   });
 });

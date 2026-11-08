@@ -11,3 +11,6 @@ export { HITS } from './levels/hits';
 export * from './songs/publicDomain';
 export { WORLD_2 } from './levels/world2';
 export { WORLD_3 } from './levels/world3';
+export { WORLD_4 } from './levels/world4';
+export { WORLD_5 } from './levels/world5';
+export { WORLD_6 } from './levels/world6';

@@ -100,6 +100,11 @@ select {
   border: 1px solid var(--panel-border); border-radius: 999px; padding: 8px 16px; cursor: pointer; min-height: 40px;
 }
 .collection-tab.active { color: var(--text); background: rgba(255, 77, 109, 0.16); border-color: var(--accent); }
+.collection-tab { font-size: 0.85rem; padding: 6px 12px; min-height: 36px; }
+.tab-num {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.12); margin-right: 2px;
+}
 .famous { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.06em; color: #ffd93d; text-transform: uppercase; }
 .credit { font-style: italic; margin-top: 0; }
 .level-grid { list-style: none; padding: 0; margin: 10px 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
