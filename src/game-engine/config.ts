@@ -15,6 +15,10 @@ export interface ScoringConfig {
   readonly bonusPerStep: number;
   /** …but never exceeds this cap. */
   readonly maxMultiplier: number;
+  /** Bonus for a hold note kept down to (near) its end, scaled by the combo multiplier. */
+  readonly holdBonus: number;
+  /** Fraction of the hit keys' base points kept for a partially played chord. */
+  readonly partialChordFactor: number;
 }
 
 export interface EngineConfig {
@@ -37,6 +41,15 @@ export interface EngineConfig {
   readonly endTailMs: number;
   /** Whether a wrong / extra keypress resets the combo. */
   readonly wrongNoteBreaksCombo: boolean;
+  /**
+   * Max spread (ms) between the first and last key of a chord. A complete
+   * chord played more spread out than this is downgraded one judgment.
+   */
+  readonly chordWindowMs: number;
+  /** A hold released at most this long before the note's end still counts as held. */
+  readonly releaseToleranceMs: number;
+  /** Discover mode: the song stops at each note until the right keys are played. */
+  readonly waitForNotes: boolean;
 }
 
 export const DEFAULT_TIMING_WINDOWS: TimingWindows = { perfect: 60, great: 130, good: 220 };
@@ -46,6 +59,8 @@ export const DEFAULT_SCORING: ScoringConfig = {
   comboStep: 10,
   bonusPerStep: 0.1,
   maxMultiplier: 1.5,
+  holdBonus: 50,
+  partialChordFactor: 0.5,
 };
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -57,6 +72,9 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   resumeCountdownBeats: 3,
   endTailMs: 800,
   wrongNoteBreaksCombo: true,
+  chordWindowMs: 100,
+  releaseToleranceMs: 220,
+  waitForNotes: false,
 };
 
 export type EngineConfigInput = Partial<Omit<EngineConfig, 'windows' | 'scoring'>> & {
@@ -75,6 +93,18 @@ export function resolveConfig(input: EngineConfigInput = {}): EngineConfig {
     windows,
     scoring: { ...DEFAULT_SCORING, ...input.scoring },
   };
+}
+
+const ORDER: readonly Judgment[] = ['perfect', 'great', 'good', 'miss'];
+
+/** The worse of two judgments. */
+export function worstJudgment(a: Judgment, b: Judgment): Judgment {
+  return ORDER.indexOf(a) >= ORDER.indexOf(b) ? a : b;
+}
+
+/** One step worse, but never below Good (used for loosely played chords). */
+export function downgradeJudgment(j: HitJudgment): HitJudgment {
+  return j === 'perfect' ? 'great' : 'good';
 }
 
 /** Classify an absolute timing error. Window edges are inclusive. */

@@ -31,6 +31,10 @@ export function validateSong(song: SongDefinition): ValidationResult {
   });
 
   if (song.notes.length === 0) err('Song has no notes');
+  if (song.holdMinBeats !== undefined && !(song.holdMinBeats > 0)) err('holdMinBeats must be positive');
+  song.assist?.fadeRanges?.forEach(([from, to], i) => {
+    if (!(Number.isFinite(from) && Number.isFinite(to) && from >= 0 && to > from)) err(`Fade range ${i} is invalid`);
+  });
 
   const lastEndByPitch = new Map<number, number>();
   const sorted = [...song.notes].map((n, i) => ({ n, i })).sort((a, b) => a.n.startBeat - b.n.startBeat);

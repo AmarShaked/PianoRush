@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileSong, SongValidationError, starlightSteps, validateSong, sequence, SONGS, type SongDefinition } from './index';
+import { compileSong, SongValidationError, starlightSteps, validateSong, sequence, WORLD_1, type SongDefinition } from './index';
 
 describe('Starlight Steps (M1 test song)', () => {
   const compiled = compileSong(starlightSteps);
@@ -33,8 +33,10 @@ describe('Starlight Steps (M1 test song)', () => {
     expect(compiled.notes[2]).toMatchObject({ startBeat: 2, timeMs: 1200, durationMs: 1200, lane: 4 });
   });
 
-  it('is registered in the catalog', () => {
-    expect(SONGS).toContain(starlightSteps);
+  it('is the World 1 finale ("First Concert")', () => {
+    const finale = WORLD_1.levels.at(-1)!;
+    expect(finale.title).toBe('First Concert');
+    expect(finale.song.notes).toBe(starlightSteps.notes);
   });
 });
 

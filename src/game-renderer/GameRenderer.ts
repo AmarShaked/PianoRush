@@ -36,7 +36,6 @@ type Effect =
 const HIT_FX_MS = 420;
 const MISS_FX_MS = 320;
 const WRONG_FX_MS = 260;
-const HOLD_MIN_BEATS = 1.5;
 
 /**
  * PixiJS presentation of the play field.
@@ -69,6 +68,8 @@ export class GameRenderer {
   private readonly judgmentText: Text;
   private readonly timingText: Text;
   private readonly countdownText: Text;
+  private readonly hintText: Text;
+  private readonly hintBg = new Graphics();
 
   private readonly glowLevels: number[];
   private effects: Effect[] = [];
@@ -103,6 +104,7 @@ export class GameRenderer {
     this.judgmentText = bigText(40);
     this.timingText = bigText(16, '700');
     this.countdownText = bigText(160);
+    this.hintText = bigText(26, '800');
 
     for (let i = 0; i < options.lanes.length; i++) {
       const g = new Graphics();
@@ -126,6 +128,8 @@ export class GameRenderer {
       this.judgmentText,
       this.timingText,
       this.countdownText,
+      this.hintBg,
+      this.hintText,
     );
     app.stage.addChild(this.root);
     // The static backdrop is flattened into one texture: far less overdraw on
@@ -158,27 +162,46 @@ export class GameRenderer {
     this.frameSource = source;
   }
 
-  triggerJudgment(lane: number, judgment: Judgment, offsetMs: number | null): void {
+  /** Per-key feedback in a lane (one call per key, also for each key of a chord). */
+  triggerNote(lane: number, judgment: Judgment): void {
     const now = performance.now();
-    if (judgment === 'miss') {
-      this.effects.push({ kind: 'miss', lane, start: now });
-    } else {
-      this.effects.push({ kind: 'hit', lane, start: now, judgment, seed: Math.random() * Math.PI * 2 });
-    }
+    if (judgment === 'miss') this.effects.push({ kind: 'miss', lane, start: now });
+    else this.effects.push({ kind: 'hit', lane, start: now, judgment, seed: Math.random() * Math.PI * 2 });
+  }
+
+  /** The judgment popup for a whole musical event (note or chord). */
+  showJudgment(judgment: Judgment, offsetMs: number | null, partialChord = false): void {
     const style = JUDGMENT_STYLE[judgment];
-    this.judgmentText.text = style.label;
-    this.judgmentText.tint = style.color;
-    this.judgmentShownAt = now;
+    this.judgmentText.text = partialChord ? 'PARTIAL' : style.label;
+    this.judgmentText.tint = partialChord ? JUDGMENT_STYLE.good.color : style.color;
+    this.judgmentShownAt = performance.now();
     if (judgment === 'perfect' || judgment === 'miss' || offsetMs === null) {
-      this.timingText.text = '';
+      this.setSubText('', 0);
     } else {
-      this.timingText.text = offsetMs < 0 ? 'EARLY' : 'LATE';
-      this.timingText.tint = offsetMs < 0 ? 0x9ecbff : 0xffb38a;
+      this.setSubText(offsetMs < 0 ? 'EARLY' : 'LATE', offsetMs < 0 ? 0x9ecbff : 0xffb38a);
     }
+  }
+
+  /** Result of a hold note's release. */
+  triggerHold(lane: number, result: 'full' | 'early'): void {
+    const now = performance.now();
+    if (result === 'full') {
+      this.effects.push({ kind: 'hit', lane, start: now, judgment: 'great', seed: Math.random() * Math.PI * 2 });
+      this.setSubText('HOLD!', 0x8dff8a);
+    } else {
+      this.effects.push({ kind: 'miss', lane, start: now });
+      this.setSubText('RELEASED EARLY', 0xffb38a);
+    }
+    this.judgmentShownAt = Math.max(this.judgmentShownAt, now - 300);
   }
 
   triggerWrongNote(lane: number | null): void {
     this.effects.push({ kind: 'wrong', lane, start: performance.now() });
+  }
+
+  private setSubText(text: string, color: number): void {
+    this.timingText.text = text;
+    if (text) this.timingText.tint = color;
   }
 
   destroy(): void {
@@ -373,13 +396,19 @@ export class GameRenderer {
 
     const r = this.receptors;
     r.clear();
+    const wait = this.opts.reducedMotion ? 1 : 0.5 + 0.5 * Math.sin(performance.now() / 160);
     this.opts.lanes.forEach((lane, i) => {
       const held = s.heldNotes.has(lane.midi);
+      const wanted = s.waitingFor.includes(lane.midi);
       const x = layout.left + i * layout.laneWidth + 6;
       const color = laneColor(i);
+      if (wanted) {
+        // Discover: show exactly which key the song is waiting for.
+        r.roundRect(x - 4, layout.hitY - 20, layout.laneWidth - 4, 40, 12).fill({ color, alpha: 0.15 + 0.25 * wait });
+      }
       r.roundRect(x, layout.hitY - 14, layout.laneWidth - 12, 28, 8)
-        .fill({ color, alpha: held ? 0.45 : 0.08 })
-        .stroke({ width: 2, color, alpha: held ? 1 : 0.45 });
+        .fill({ color, alpha: held ? 0.45 : wanted ? 0.25 : 0.08 })
+        .stroke({ width: wanted ? 3 : 2, color, alpha: held || wanted ? 1 : 0.45 });
     });
   }
 
@@ -396,7 +425,7 @@ export class GameRenderer {
       // Notes are time-sorted: once one is above the screen, all later ones are too.
       if (noteBottomY(layout, n.timeMs, s.songTime) < -40) break;
       const endTime = n.timeMs + n.durationMs;
-      if (n.status === 'hit' && s.songTime > Math.max(endTime, (n.judgedAt ?? 0) + 150)) continue;
+      if (n.status === 'hit' && n.hold !== 'early' && s.songTime > Math.max(endTime, (n.judgedAt ?? 0) + 150)) continue;
       if (n.status === 'missed' && s.songTime - n.timeMs > 1500) continue;
 
       const color = laneColor(n.lane);
@@ -404,11 +433,19 @@ export class GameRenderer {
       const w = layout.laneWidth - pad * 2;
       let bottom = noteBottomY(layout, n.timeMs, s.songTime);
       let top = bottom - n.durationMs * layout.pxPerMs + gap;
-      const isHold = n.durationBeats >= HOLD_MIN_BEATS;
+      const isHold = n.isHold;
 
       if (n.status === 'hit') {
-        const sustaining = isHold && n.releasedAt === null && s.songTime < endTime;
-        if (sustaining) {
+        if (n.hold === 'early') {
+          // Released too soon: the unplayed rest of the note greys out and fades.
+          const t = (s.songTime - (n.releasedAt ?? s.songTime)) / 300;
+          if (t >= 1 || t < 0) continue;
+          bottom = Math.min(bottom, layout.hitY);
+          if (bottom - top < 2) continue;
+          g.roundRect(x, top, w, bottom - top, radius).fill({ color: COLORS.missed, alpha: 0.6 * (1 - t) });
+          continue;
+        }
+        if (n.hold === 'holding') {
           // The remaining part of the held note drains into the hit line.
           bottom = Math.min(bottom, layout.hitY);
           if (bottom - top < 2) continue;
@@ -438,23 +475,27 @@ export class GameRenderer {
         continue;
       }
 
-      // Pending tile
-      const proximity = clamp(1 - (n.timeMs - s.songTime) / msPerBeat, 0, 1);
+      // Pending tile. Memory assistance fades it out over the last beats before the line.
+      const beatsAway = (n.timeMs - s.songTime) / msPerBeat;
+      // Hidden for the last 1.5 beats: the player must remember which key comes next.
+      const a = n.assistFade ? clamp((beatsAway - 1.5) / 0.75, 0, 1) : 1;
+      if (a <= 0) continue;
+      const proximity = clamp(1 - beatsAway, 0, 1);
       if (proximity > 0) {
-        g.roundRect(x - 4, top - 4, w + 8, h + 8, radius + 4).fill({ color, alpha: 0.18 * proximity });
+        g.roundRect(x - 4, top - 4, w + 8, h + 8, radius + 4).fill({ color, alpha: 0.18 * proximity * a });
       }
       if (isHold) {
-        g.roundRect(x, top, w, h, radius).fill({ color: shade(color, -0.35), alpha: 0.9 }).stroke({ width: 2, color, alpha: 0.95 });
-        g.roundRect(x + w * 0.38, top + 6, w * 0.24, Math.max(0, h - 12 - 26), 3).fill({ color, alpha: 0.85 });
+        g.roundRect(x, top, w, h, radius).fill({ color: shade(color, -0.35), alpha: 0.9 * a }).stroke({ width: 2, color, alpha: 0.95 * a });
+        g.roundRect(x + w * 0.38, top + 6, w * 0.24, Math.max(0, h - 12 - 26), 3).fill({ color, alpha: 0.85 * a });
         const headH = Math.min(h, 26);
-        g.roundRect(x, bottom - headH, w, headH, radius).fill({ color, alpha: 1 });
+        g.roundRect(x, bottom - headH, w, headH, radius).fill({ color, alpha: a });
       } else {
-        g.roundRect(x, top, w, h, radius).fill({ color, alpha: 1 });
-        g.roundRect(x + 3, top + 3, w - 6, Math.min(h * 0.35, 18), radius * 0.7).fill({ color: 0xffffff, alpha: 0.22 });
+        g.roundRect(x, top, w, h, radius).fill({ color, alpha: a });
+        g.roundRect(x + 3, top + 3, w - 6, Math.min(h * 0.35, 18), radius * 0.7).fill({ color: 0xffffff, alpha: 0.22 * a });
       }
-      g.roundRect(x, top, w, h, radius).stroke({ width: 2, color: shade(color, 0.55), alpha: 0.9 });
+      g.roundRect(x, top, w, h, radius).stroke({ width: 2, color: shade(color, 0.55), alpha: 0.9 * a });
 
-      if (h >= 24) this.placeLabel(labelIndex++, n, x + w / 2, bottom - Math.min(h, 26) / 2 - 1, layout);
+      if (h >= 24 && a >= 0.6) this.placeLabel(labelIndex++, n, x + w / 2, bottom - Math.min(h, 26) / 2 - 1, layout);
     }
     for (let i = labelIndex; i < this.labelPool.length; i++) this.labelPool[i]!.visible = false;
   }
@@ -541,7 +582,9 @@ export class GameRenderer {
   }
 
   private drawKeys(layout: PlayfieldLayout, s: GameSnapshot): void {
-    const pressedKey = this.opts.lanes.map((l) => (s.heldNotes.has(l.midi) ? 1 : 0)).join('');
+    const pressedKey = this.opts.lanes
+      .map((l) => (s.heldNotes.has(l.midi) ? 1 : 0) + (s.waitingFor.includes(l.midi) ? 2 : 0))
+      .join('');
     if (pressedKey === this.lastPressedKey) return;
     this.lastPressedKey = pressedKey;
 
@@ -559,6 +602,9 @@ export class GameRenderer {
       g.roundRect(x, y + 4, w, h, 8).fill({ color: COLORS.keyShadow, alpha: pressed ? 0 : 1 });
       g.roundRect(x, y, w, h, 8).fill(pressed ? shade(color, 0.45) : COLORS.keyWhite);
       g.rect(x, y, w, 5).fill(color);
+      if (!pressed && s.waitingFor.includes(lane.midi)) {
+        g.roundRect(x + 2, y + 2, w - 4, h - 4, 7).stroke({ width: 4, color });
+      }
       if (lane.isMiddleC) {
         if (this.middleCOutside) {
           const ty = keysTop + keysHeight * 0.62;
@@ -626,6 +672,22 @@ export class GameRenderer {
     }
     this.countdownText.text = count;
     this.countdownText.position.set(cx, layout.hitY * 0.45);
+
+    // Discover: name the key(s) the song is waiting for.
+    if (s.state === 'waiting' && s.waitingFor.length) {
+      const names = s.waitingFor.map((m) => this.opts.lanes.find((l) => l.midi === m)?.noteName ?? '').join(' + ');
+      this.hintText.text = `PLAY  ${names}`;
+      this.hintText.position.set(cx, layout.hitY * 0.62);
+      this.hintText.alpha = this.opts.reducedMotion ? 1 : 0.8 + 0.2 * Math.sin(now / 160);
+      const bw = this.hintText.width + 40;
+      const bh = this.hintText.height + 16;
+      this.hintBg.clear();
+      this.hintBg.roundRect(cx - bw / 2, layout.hitY * 0.62 - bh / 2, bw, bh, bh / 2).fill({ color: 0x0b0b18, alpha: 0.85 }).stroke({ width: 2, color: 0xffffff, alpha: 0.25 });
+      this.hintBg.visible = true;
+    } else {
+      this.hintText.alpha = 0;
+      this.hintBg.visible = false;
+    }
     this.countdownText.alpha = count ? 1 - frac * 0.75 : 0;
     this.countdownText.scale.set(this.opts.reducedMotion ? 1 : 1 + (1 - frac) * 0.25);
   }

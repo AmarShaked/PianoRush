@@ -1,29 +1,47 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { GameResults } from '../game-engine/GameEngine';
-import { compileSong } from '../song-content/compile';
-import { starlightSteps } from '../song-content';
+import {
+  applyRun,
+  evaluateRun,
+  isLevelUnlocked,
+  nextLevelToPlay,
+  type ProgressMap,
+  type ProgressUpdate,
+  type RunOutcome,
+} from '../game-engine/progression';
+import type { GameMode, LevelDefinition } from '../song-content/level';
 import type { PianoInputSource } from '../piano-input/types';
+import { LEVELS, songFor, WORLDS } from './catalog';
 import { keyboardSimulator, midiManager } from './inputs';
-import { getBestScore, loadSettings, recordScore, saveSettings, type Settings } from './storage';
+import { loadProgress, loadSettings, saveProgress, saveSettings, type Settings } from './storage';
 import { useMidi } from './useMidi';
-import { StartScreen } from './screens/StartScreen';
+import { HomeScreen } from './screens/HomeScreen';
 import { GameScreen } from './screens/GameScreen';
 import { ResultsScreen } from './screens/ResultsScreen';
 import { DiagnosticsScreen } from './screens/DiagnosticsScreen';
 
-// M1 ships a single level. The song catalog / level progression plugs in here later.
-const SONG = compileSong(starlightSteps);
 const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator];
+const FIRST_LEVEL = LEVELS[0]!;
 
 type Screen =
-  | { readonly name: 'start' }
-  | { readonly name: 'game'; readonly run: number; readonly settings: Settings }
-  | { readonly name: 'results'; readonly results: GameResults; readonly previousBest: number }
+  | { readonly name: 'home' }
+  | { readonly name: 'game'; readonly run: number; readonly level: LevelDefinition; readonly mode: GameMode; readonly settings: Settings }
+  | {
+      readonly name: 'results';
+      readonly level: LevelDefinition;
+      readonly mode: GameMode;
+      readonly results: GameResults;
+      readonly outcome: RunOutcome;
+      readonly update: ProgressUpdate;
+    }
   | { readonly name: 'diagnostics' };
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
-  const [screen, setScreen] = useState<Screen>({ name: 'start' });
+  const [progress, setProgress] = useState<ProgressMap>(loadProgress);
+  // Returning players continue where they left off.
+  const [selected, setSelected] = useState<LevelDefinition>(() => nextLevelToPlay(LEVELS, loadProgress()) ?? FIRST_LEVEL);
+  const [screen, setScreen] = useState<Screen>({ name: 'home' });
   const [run, setRun] = useState(0);
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
@@ -49,51 +67,92 @@ export function App() {
     return () => keyboardSimulator.disable();
   }, [gameSimEnabled]);
 
-  const play = useCallback(() => {
-    setRun((r) => r + 1);
-    // Settings are frozen for the duration of a run.
-    setScreen({ name: 'game', run: run + 1, settings });
-  }, [run, settings]);
+  const startLevel = useCallback(
+    (level: LevelDefinition, mode: GameMode) => {
+      setSelected(level);
+      setRun((r) => r + 1);
+      // Settings are frozen for the duration of a run.
+      setScreen({ name: 'game', run: run + 1, level, mode, settings });
+    },
+    [run, settings],
+  );
 
-  const finish = useCallback((results: GameResults) => {
-    const previousBest = recordScore(results.songId, results.score);
-    setScreen({ name: 'results', results, previousBest });
-  }, []);
+  const finish = useCallback(
+    (level: LevelDefinition, mode: GameMode, results: GameResults) => {
+      const outcome = evaluateRun(level, results, mode);
+      const update = applyRun(LEVELS, progress, level.id, outcome, results.score);
+      setProgress(update.progress);
+      saveProgress(update.progress);
+      setScreen({ name: 'results', level, mode, results, outcome, update });
+    },
+    [progress],
+  );
 
-  const toMenu = useCallback(() => setScreen({ name: 'start' }), []);
+  const toHome = useCallback(() => setScreen({ name: 'home' }), []);
+  const mode = settings.preferredMode;
 
   switch (screen.name) {
     case 'game':
-      return <GameScreen key={screen.run} song={SONG} inputs={INPUTS} settings={screen.settings} onFinished={finish} onQuit={toMenu} />;
-    case 'results':
       return (
-        <ResultsScreen
-          title={SONG.definition.title}
-          results={screen.results}
-          previousBest={screen.previousBest}
-          onRetry={play}
-          onMenu={toMenu}
+        <GameScreen
+          key={screen.run}
+          level={screen.level}
+          song={songFor(screen.level)}
+          mode={screen.mode}
+          inputs={INPUTS}
+          settings={screen.settings}
+          onFinished={(results) => finish(screen.level, screen.mode, results)}
+          onQuit={toHome}
         />
       );
+    case 'results': {
+      const index = LEVELS.indexOf(screen.level);
+      const next = LEVELS[index + 1];
+      const nextLevel = next && isLevelUnlocked(LEVELS, index + 1, progress) ? next : null;
+      return (
+        <ResultsScreen
+          level={screen.level}
+          mode={screen.mode}
+          results={screen.results}
+          outcome={screen.outcome}
+          update={screen.update}
+          nextLevel={nextLevel}
+          onRetry={() => startLevel(screen.level, screen.mode)}
+          onPlayMode={(m) => {
+            updateSettings({ preferredMode: m });
+            startLevel(screen.level, m);
+          }}
+          onNext={() => nextLevel && startLevel(nextLevel, screen.mode === 'discover' ? 'flow' : screen.mode)}
+          onMenu={() => {
+            if (screen.update.unlockedNext && nextLevel) setSelected(nextLevel);
+            toHome();
+          }}
+        />
+      );
+    }
     case 'diagnostics':
       return (
         <DiagnosticsScreen
           midi={midi}
           keyboardSimulatorEnabled={settings.keyboardSimulator}
           onKeyboardSimulatorChange={(v) => updateSettings({ keyboardSimulator: v })}
-          lanes={SONG.definition.lanes}
-          onBack={toMenu}
+          lanes={[60, 62, 64, 65, 67]}
+          onBack={toHome}
         />
       );
     default:
       return (
-        <StartScreen
-          song={SONG}
-          bestScore={getBestScore(SONG.definition.id)}
+        <HomeScreen
+          world={WORLDS[0]}
+          progress={progress}
+          selected={selected}
+          onSelect={setSelected}
+          mode={mode}
+          onModeChange={(m) => updateSettings({ preferredMode: m })}
           midi={midi}
           settings={settings}
           onSettingsChange={updateSettings}
-          onPlay={play}
+          onPlay={() => startLevel(selected, mode)}
           onDiagnostics={() => setScreen({ name: 'diagnostics' })}
         />
       );

@@ -1,18 +1,22 @@
 import type { PianoEvent } from '../piano-input/types';
 import type { CompiledSong, TimedNote } from '../song-content/compile';
-import { judgeOffset, resolveConfig, type EngineConfig, type EngineConfigInput, type Judgment } from './config';
 import {
-  emptyCounts,
-  noteAccuracy,
-  pointsFor,
-  starsFor,
-  timingAccuracy,
-  type JudgmentCounts,
-} from './scoring';
+  downgradeJudgment,
+  judgeOffset,
+  resolveConfig,
+  worstJudgment,
+  type EngineConfig,
+  type EngineConfigInput,
+  type HitJudgment,
+  type Judgment,
+} from './config';
+import { comboMultiplier, emptyCounts, noteAccuracy, pointsFor, timingAccuracy, type JudgmentCounts } from './scoring';
 import { Transport } from './Transport';
 
-export type GameState = 'ready' | 'countdown' | 'playing' | 'paused' | 'resuming' | 'finished';
+export type GameState = 'ready' | 'countdown' | 'playing' | 'waiting' | 'paused' | 'resuming' | 'finished';
 export type NoteStatus = 'pending' | 'hit' | 'missed';
+/** Hold-note lifecycle after the key went down: `holding` until released or the note ends. */
+export type HoldStatus = 'none' | 'holding' | 'full' | 'early';
 
 export interface NoteState extends TimedNote {
   status: NoteStatus;
@@ -21,20 +25,38 @@ export interface NoteState extends TimedNote {
   offsetMs: number | null;
   /** Song time the judgment applies to (hit time, or window close for a miss). */
   judgedAt: number | null;
-  /** Song time the key was released after a hit (visual only in M1). */
+  /** Song time the key was released after a hit. */
   releasedAt: number | null;
+  hold: HoldStatus;
+}
+
+/** A musical event (single note or chord) — the unit of scoring, combo and accuracy. */
+export interface EventState {
+  readonly id: number;
+  readonly timeMs: number;
+  readonly notes: readonly NoteState[];
+  resolved: boolean;
+  judgment: Judgment | null;
+  /** A chord where some, but not all, keys were played. */
+  partial: boolean;
+  points: number;
 }
 
 export type EngineEvent =
+  /** One key of an event was judged (drives per-lane effects). */
+  | { readonly type: 'note'; readonly note: Readonly<NoteState>; readonly judgment: Judgment; readonly offsetMs: number | null }
+  /** A whole event (note or chord) resolved: scoring, combo. */
   | {
       readonly type: 'judgment';
-      readonly note: Readonly<NoteState>;
+      readonly event: Readonly<EventState>;
       readonly judgment: Judgment;
+      /** Mean offset of the keys that were hit, or null. */
       readonly offsetMs: number | null;
       readonly points: number;
       readonly combo: number;
       readonly score: number;
     }
+  | { readonly type: 'hold'; readonly note: Readonly<NoteState>; readonly result: 'full' | 'early'; readonly points: number }
   | { readonly type: 'wrongNote'; readonly midi: number; readonly lane: number | null; readonly songTime: number }
   | { readonly type: 'state'; readonly state: GameState; readonly previous: GameState };
 
@@ -56,20 +78,27 @@ export interface GameSnapshot {
   readonly heldNotes: ReadonlySet<number>;
   /** Remaining ms of the post-resume countdown, when state === 'resuming'. */
   readonly resumeRemainingMs: number | null;
+  /** Discover mode: pitches still needed to continue, when state === 'waiting'. */
+  readonly waitingFor: readonly number[];
 }
 
 export interface GameResults {
   readonly songId: string;
   readonly score: number;
   readonly maxCombo: number;
+  /** Per musical event (a chord counts once). */
   readonly counts: Readonly<JudgmentCounts>;
   readonly wrongNotes: number;
   readonly totalNotes: number;
+  readonly totalEvents: number;
+  /** Events played correctly (any hit judgment) / all events. */
   readonly noteAccuracy: number;
+  /** Timing quality weighted by judgment. */
   readonly timingAccuracy: number;
-  readonly stars: 1 | 2 | 3;
-  /** Average signed offset of hits (positive = tends to play late). */
+  /** Average signed offset of hit keys (positive = tends to play late). */
   readonly meanOffsetMs: number | null;
+  readonly holds: { readonly total: number; readonly full: number };
+  readonly partialChords: number;
 }
 
 export interface HitResult {
@@ -79,7 +108,8 @@ export interface HitResult {
 }
 
 /**
- * Pure game logic: timeline, matching, judgments, score/combo, state machine.
+ * Pure game logic: timeline, matching, judgments, score/combo, holds, chords,
+ * Discover-mode waiting and the state machine.
  *
  * No React, PixiJS, DOM or audio dependencies. All time arrives as explicit
  * clock timestamps (ms, monotonic — the same base as PianoEvent.time), so the
@@ -92,6 +122,7 @@ export class GameEngine {
 
   private readonly transport: Transport;
   private notes: NoteState[] = [];
+  private events: EventState[] = [];
   private state: GameState = 'ready';
   private score = 0;
   private combo = 0;
@@ -100,11 +131,16 @@ export class GameEngine {
   private wrongNotes = 0;
   private offsetSum = 0;
   private hitCount = 0;
-  /** Index of the first note that may still be pending (all before are judged). */
+  private holdsFull = 0;
+  private partialChords = 0;
+  /** Index of the first note that may still be pending. */
   private cursor = 0;
+  /** Index of the first event that is not yet resolved. */
+  private eventCursor = 0;
+  private readonly holding = new Set<NoteState>();
+  private waitingEvent: EventState | null = null;
   private readonly held = new Map<number, number>(); // midi → clock time of noteOn
   private readonly listeners = new Set<EngineListener>();
-  private lastClock = 0;
 
   constructor(song: CompiledSong, config: EngineConfigInput = {}) {
     this.song = song;
@@ -137,24 +173,26 @@ export class GameEngine {
   start(clock: number): void {
     if (this.state !== 'ready') return;
     this.transport.start(clock);
-    this.lastClock = clock;
     this.setState(this.transport.songTime(clock) < 0 ? 'countdown' : 'playing');
+    this.update(clock);
   }
 
   pause(clock: number): void {
-    if (this.state !== 'countdown' && this.state !== 'playing' && this.state !== 'resuming') return;
+    if (!this.isRunningState()) return;
     // Settle everything that happened up to the pause moment (independent of frame timing).
     this.update(clock);
-    if (this.currentState === 'finished') return;
-    this.transport.pause(clock);
+    if (!this.isRunningState()) return;
+    // Holds can't be expected to survive a pause menu: credit them.
+    for (const note of [...this.holding]) this.finishHold(note, 'full');
+    this.transport.pause(clock, 'user');
     this.setState('paused');
   }
 
-  /** Resume after a frozen countdown of `resumeCountdownBeats` (skipped during the count-in). */
+  /** Resume after a frozen countdown of `resumeCountdownBeats` (skipped in the count-in or while waiting). */
   resume(clock: number): void {
     if (this.state !== 'paused') return;
-    const inCountIn = this.transport.songTime(clock) < 0;
-    const delay = inCountIn ? 0 : this.config.resumeCountdownBeats * this.song.msPerBeat;
+    const skipCountdown = this.transport.songTime(clock) < 0 || this.waitingEvent !== null;
+    const delay = skipCountdown ? 0 : this.config.resumeCountdownBeats * this.song.msPerBeat;
     this.transport.resume(clock, delay);
     this.setState('resuming');
     this.update(clock);
@@ -171,24 +209,33 @@ export class GameEngine {
     this.wrongNotes = 0;
     this.offsetSum = 0;
     this.hitCount = 0;
+    this.holdsFull = 0;
+    this.partialChords = 0;
+    this.holding.clear();
+    this.waitingEvent = null;
     this.setState('ready');
   }
 
-  /** Advance to `clock`: state transitions, miss detection, completion. Safe at any rate. */
+  /** Advance to `clock`: state transitions, holds, waits, misses, completion. Safe at any rate. */
   update(clock: number): void {
-    this.lastClock = Math.max(this.lastClock, clock);
     if (this.state === 'ready' || this.state === 'finished') return;
 
-    if (this.transport.isPausedAt(clock)) {
+    if (this.transport.isUserPausedAt(clock)) {
       if (this.state === 'resuming' && this.transport.pendingResumeAt(clock) === null) this.setState('paused');
+      return;
+    }
+    if (this.transport.isWaitingAt(clock)) {
+      this.setState('waiting');
       return;
     }
 
     const songTime = this.transport.songTime(clock);
+    this.resolveHoldsUntil(songTime);
+    if (this.config.waitForNotes && this.beginWaitIfDue(clock, songTime)) return;
     this.declareMissesBefore(songTime - this.config.missGraceMs);
     this.setState(songTime < 0 ? 'countdown' : 'playing');
 
-    if (this.cursor >= this.notes.length && songTime >= this.endSongTime) {
+    if (this.eventCursor >= this.events.length && this.holding.size === 0 && songTime >= this.endSongTime) {
       this.setState('finished');
     }
   }
@@ -212,6 +259,12 @@ export class GameEngine {
     this.held.set(event.note, event.time);
 
     if (!this.isActiveAt(event.time)) return null;
+    if (prevOn !== undefined) this.markRelease(event.note, this.songTimeOfInput(event.time)); // lost noteOff
+
+    if (this.config.waitForNotes && !this.transport.isPausedAt(event.time)) {
+      // A wait may be due before this press (e.g. no frame ran in between).
+      this.beginWaitIfDue(event.time, this.transport.songTime(event.time));
+    }
 
     const songTime = this.songTimeOfInput(event.time);
     this.declareMissesBefore(songTime);
@@ -224,7 +277,14 @@ export class GameEngine {
     }
     const offsetMs = songTime - note.timeMs;
     const judgment = judgeOffset(offsetMs, this.config.windows);
-    this.applyJudgment(note, judgment, offsetMs, songTime);
+    this.applyNoteJudgment(note, judgment, offsetMs, songTime);
+
+    const waiting = this.waitingEvent;
+    if (waiting && waiting.resolved) {
+      this.waitingEvent = null;
+      this.transport.resume(event.time, 0);
+      this.setState('playing');
+    }
     return { note, judgment, offsetMs };
   }
 
@@ -237,6 +297,10 @@ export class GameEngine {
   getSnapshot(clock: number): GameSnapshot {
     const songTime = this.songTimeAt(clock);
     const resumeAt = this.state === 'resuming' ? this.transport.pendingResumeAt(clock) : null;
+    const waitingFor =
+      this.waitingEvent && (this.state === 'waiting' || this.state === 'paused' || this.state === 'resuming')
+        ? this.waitingEvent.notes.filter((n) => n.status === 'pending').map((n) => n.midi)
+        : [];
     return {
       state: this.state,
       songTime,
@@ -250,11 +314,11 @@ export class GameEngine {
       notes: this.notes,
       heldNotes: new Set(this.held.keys()),
       resumeRemainingMs: resumeAt === null ? null : resumeAt - clock,
+      waitingFor,
     };
   }
 
   getResults(): GameResults {
-    const acc = noteAccuracy(this.counts);
     return {
       songId: this.song.definition.id,
       score: this.score,
@@ -262,10 +326,12 @@ export class GameEngine {
       counts: { ...this.counts },
       wrongNotes: this.wrongNotes,
       totalNotes: this.notes.length,
-      noteAccuracy: acc,
+      totalEvents: this.events.length,
+      noteAccuracy: noteAccuracy(this.counts),
       timingAccuracy: timingAccuracy(this.counts),
-      stars: starsFor(acc),
       meanOffsetMs: this.hitCount === 0 ? null : this.offsetSum / this.hitCount,
+      holds: { total: this.song.holdCount, full: this.holdsFull },
+      partialChords: this.partialChords,
     };
   }
 
@@ -279,16 +345,43 @@ export class GameEngine {
       offsetMs: null,
       judgedAt: null,
       releasedAt: null,
+      hold: 'none',
+    }));
+    this.events = this.song.events.map((e) => ({
+      id: e.id,
+      timeMs: e.timeMs,
+      notes: e.noteIds.map((id) => this.notes[id]!),
+      resolved: false,
+      judgment: null,
+      partial: false,
+      points: 0,
     }));
     this.cursor = 0;
+    this.eventCursor = 0;
+  }
+
+  private isRunningState(): boolean {
+    return this.state === 'countdown' || this.state === 'playing' || this.state === 'resuming' || this.state === 'waiting';
   }
 
   private isActiveAt(clock: number): boolean {
-    return this.state !== 'ready' && this.state !== 'finished' && this.transport.isRunningAt(clock);
+    return this.state !== 'ready' && this.state !== 'finished' && this.transport.acceptsInputAt(clock);
   }
 
   private songTimeOfInput(clock: number): number {
-    return this.transport.songTime(clock) - this.config.inputOffsetMs;
+    const songTime = this.transport.songTime(clock);
+    // While Discover waits, the tile sits on the line: any press is on time.
+    return this.transport.isWaitingAt(clock) ? songTime : songTime - this.config.inputOffsetMs;
+  }
+
+  /** Discover mode: freeze the song exactly when the next unresolved event reaches the line. */
+  private beginWaitIfDue(clock: number, songTime: number): boolean {
+    const event = this.events[this.eventCursor];
+    if (!event || event.timeMs > songTime) return false;
+    this.transport.pause(clock - (songTime - event.timeMs), 'wait');
+    this.waitingEvent = event;
+    this.setState('waiting');
+    return true;
   }
 
   /** Earliest pending note of this pitch whose Good window contains `songTime`. */
@@ -308,36 +401,95 @@ export class GameEngine {
     for (let i = this.cursor; i < this.notes.length; i++) {
       const n = this.notes[i]!;
       if (n.timeMs + window >= songTime) break;
-      if (n.status === 'pending') this.applyJudgment(n, 'miss', null, n.timeMs + window);
+      if (n.status === 'pending') this.applyNoteJudgment(n, 'miss', null, n.timeMs + window);
     }
-    this.advanceCursor();
   }
 
-  private advanceCursor(): void {
-    while (this.cursor < this.notes.length && this.notes[this.cursor]!.status !== 'pending') this.cursor++;
-  }
-
-  private applyJudgment(note: NoteState, judgment: Judgment, offsetMs: number | null, songTime: number): void {
-    if (note.status !== 'pending') return; // each note is scored at most once
+  private applyNoteJudgment(note: NoteState, judgment: Judgment, offsetMs: number | null, songTime: number): void {
+    if (note.status !== 'pending') return; // each note is judged at most once
     note.status = judgment === 'miss' ? 'missed' : 'hit';
     note.judgment = judgment;
     note.offsetMs = offsetMs;
     note.judgedAt = songTime;
-    this.counts[judgment]++;
-
-    let points = 0;
-    if (judgment === 'miss') {
-      this.combo = 0;
-    } else {
-      points = pointsFor(judgment, this.combo, this.config.scoring);
-      this.score += points;
-      this.combo++;
-      this.maxCombo = Math.max(this.maxCombo, this.combo);
+    if (note.status === 'hit') {
       this.offsetSum += offsetMs ?? 0;
       this.hitCount++;
+      if (note.isHold) {
+        note.hold = 'holding';
+        this.holding.add(note);
+      }
     }
-    this.advanceCursor();
-    this.emit({ type: 'judgment', note, judgment, offsetMs, points, combo: this.combo, score: this.score });
+    while (this.cursor < this.notes.length && this.notes[this.cursor]!.status !== 'pending') this.cursor++;
+    this.emit({ type: 'note', note, judgment, offsetMs });
+
+    const event = this.events[note.eventId]!;
+    if (!event.resolved && event.notes.every((n) => n.status !== 'pending')) this.resolveEvent(event);
+  }
+
+  /**
+   * Chord policy (an event of N keys is scored once, when its last key is judged):
+   *  - all keys hit → the worst key's judgment, downgraded one step if the keys
+   *    were spread over more than `chordWindowMs`; points = base × N;
+   *  - some keys hit (partial) → counts as a Miss and breaks the combo, but keeps
+   *    `partialChordFactor` of the hit keys' base points;
+   *  - no keys hit → Miss.
+   * A single note is simply an event with N = 1.
+   */
+  private resolveEvent(event: EventState): void {
+    const hits = event.notes.filter((n) => n.status === 'hit');
+    const n = event.notes.length;
+    const { scoring } = this.config;
+    let judgment: Judgment;
+    let points = 0;
+
+    if (hits.length === n) {
+      let j = hits.reduce<Judgment>((acc, h) => worstJudgment(acc, h.judgment ?? 'miss'), 'perfect') as HitJudgment;
+      if (n > 1) {
+        const times = hits.map((h) => h.judgedAt ?? 0);
+        if (Math.max(...times) - Math.min(...times) > this.config.chordWindowMs) j = downgradeJudgment(j);
+      }
+      judgment = j;
+      points = pointsFor(j, this.combo, scoring) * n;
+      this.combo++;
+      this.maxCombo = Math.max(this.maxCombo, this.combo);
+    } else {
+      judgment = 'miss';
+      if (hits.length > 0) {
+        event.partial = true;
+        this.partialChords++;
+        points = Math.round(hits.reduce((sum, h) => sum + scoring.points[h.judgment ?? 'miss'], 0) * scoring.partialChordFactor);
+      }
+      this.combo = 0;
+    }
+
+    event.resolved = true;
+    event.judgment = judgment;
+    event.points = points;
+    this.counts[judgment]++;
+    this.score += points;
+    while (this.eventCursor < this.events.length && this.events[this.eventCursor]!.resolved) this.eventCursor++;
+
+    const offsets = hits.map((h) => h.offsetMs ?? 0);
+    const offsetMs = offsets.length ? offsets.reduce((a, b) => a + b, 0) / offsets.length : null;
+    this.emit({ type: 'judgment', event, judgment, offsetMs, points, combo: this.combo, score: this.score });
+  }
+
+  private resolveHoldsUntil(songTime: number): void {
+    for (const note of [...this.holding]) {
+      if (songTime >= note.timeMs + note.durationMs) this.finishHold(note, 'full');
+    }
+  }
+
+  private finishHold(note: NoteState, result: 'full' | 'early'): void {
+    if (!this.holding.delete(note)) return;
+    note.hold = result;
+    let points = 0;
+    if (result === 'full') {
+      points = Math.round(this.config.scoring.holdBonus * comboMultiplier(this.combo, this.config.scoring));
+      this.score += points;
+      this.holdsFull++;
+    }
+    this.emit({ type: 'hold', note, result, points });
   }
 
   private registerWrongNote(midi: number, songTime: number): void {
@@ -350,10 +502,13 @@ export class GameEngine {
   private markRelease(midi: number, songTime: number): void {
     for (let i = this.notes.length - 1; i >= 0; i--) {
       const n = this.notes[i]!;
-      if (n.midi === midi && n.status === 'hit' && n.releasedAt === null) {
-        n.releasedAt = songTime;
-        return;
+      if (n.midi !== midi || n.status !== 'hit' || n.releasedAt !== null) continue;
+      n.releasedAt = songTime;
+      if (n.hold === 'holding') {
+        const end = n.timeMs + n.durationMs;
+        this.finishHold(n, songTime >= end - this.config.releaseToleranceMs ? 'full' : 'early');
       }
+      return;
     }
   }
 

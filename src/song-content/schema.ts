@@ -18,6 +18,17 @@ export interface SongNote {
   /** Length in beats. */
   readonly durationBeats: number;
   readonly hand?: Hand;
+  /** Force (true) or suppress (false) hold-tile behaviour; default from `holdMinBeats`. */
+  readonly hold?: boolean;
+}
+
+/** Visual-assistance options (learning aids). */
+export interface SongAssist {
+  /**
+   * Beat ranges [fromBeat, toBeat) whose tiles fade out before reaching the hit
+   * line, so the player has to play them from memory.
+   */
+  readonly fadeRanges?: readonly (readonly [number, number])[];
 }
 
 export interface SongDefinition {
@@ -36,6 +47,9 @@ export interface SongDefinition {
    */
   readonly lanes: readonly number[];
   readonly notes: readonly SongNote[];
+  /** Notes at least this long (beats) are hold tiles whose release is scored. Default 1.5. */
+  readonly holdMinBeats?: number;
+  readonly assist?: SongAssist;
   /** Free-form difficulty metadata for the future learning system. */
   readonly difficulty?: { readonly level: number; readonly skills: readonly string[] };
   /** Reserved for M3: backing-track asset references. */

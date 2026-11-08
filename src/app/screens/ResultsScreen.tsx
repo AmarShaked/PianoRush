@@ -1,10 +1,19 @@
 import type { GameResults } from '../../game-engine/GameEngine';
+import type { ProgressUpdate, RunOutcome } from '../../game-engine/progression';
+import type { GameMode, LevelDefinition } from '../../song-content/level';
+import { Stars } from '../components/Stars';
+import { MODE_LABEL } from './GameScreen';
 
 interface ResultsScreenProps {
-  title: string;
+  level: LevelDefinition;
+  mode: GameMode;
   results: GameResults;
-  previousBest: number;
+  outcome: RunOutcome;
+  update: ProgressUpdate;
+  nextLevel: LevelDefinition | null;
   onRetry: () => void;
+  onPlayMode: (mode: GameMode) => void;
+  onNext: () => void;
   onMenu: () => void;
 }
 
@@ -18,9 +27,14 @@ function offsetAdvice(mean: number | null): string | null {
     : `On average you played ${ms} ms early — try waiting for the tile to touch the line.`;
 }
 
-export function ResultsScreen({ title, results, previousBest, onRetry, onMenu }: ResultsScreenProps) {
-  const newBest = results.score > previousBest;
-  const advice = offsetAdvice(results.meanOffsetMs);
+export function ResultsScreen(props: ResultsScreenProps) {
+  const { level, mode, results, outcome, update, nextLevel, onRetry, onPlayMode, onNext, onMenu } = props;
+  const discover = mode === 'discover';
+  const advice = discover ? null : offsetAdvice(results.meanOffsetMs);
+  const newChallenge = mode === 'challenge' && outcome.completed && !update.previous.challengeCleared;
+  const canGoNext = nextLevel !== null && update.current.completed;
+
+  const heading = discover ? 'Practice complete' : outcome.completed ? 'Level complete' : 'Keep practising';
   const rows: Array<[string, number, string]> = [
     ['Perfect', results.counts.perfect, 'perfect'],
     ['Great', results.counts.great, 'great'],
@@ -31,22 +45,40 @@ export function ResultsScreen({ title, results, previousBest, onRetry, onMenu }:
   return (
     <main className="screen results-screen">
       <section className="card results-card" aria-labelledby="results-title">
-        <div className="eyebrow">Level complete</div>
-        <h2 id="results-title">{title}</h2>
-
-        <div className="stars" aria-label={`${results.stars} of 3 stars`}>
-          {[1, 2, 3].map((i) => (
-            <span key={i} className={i <= results.stars ? 'star on' : 'star'} style={{ animationDelay: `${i * 150}ms` }}>
-              ★
-            </span>
-          ))}
+        <div className="eyebrow">
+          {heading} · {MODE_LABEL[mode]}
         </div>
+        <h2 id="results-title">
+          {level.number}. {level.title}
+        </h2>
+
+        {!discover && <Stars count={outcome.stars} animate />}
 
         <div className="big-score">
           {results.score.toLocaleString()}
-          {newBest && <span className="badge">New best!</span>}
+          {update.newBestScore && <span className="badge">New best!</span>}
         </div>
-        {!newBest && previousBest > 0 && <p className="muted small center">Personal best: {previousBest.toLocaleString()}</p>}
+        {!discover && !update.newBestScore && update.previous.bestScore > 0 && (
+          <p className="muted small center">Personal best: {update.previous.bestScore.toLocaleString()}</p>
+        )}
+
+        {(update.unlockedNext || newChallenge || !outcome.completed) && (
+          <div className="result-messages">
+            {update.unlockedNext && nextLevel && (
+              <p className="msg ok">
+                🔓 Level {nextLevel.number} “{nextLevel.title}” unlocked!
+              </p>
+            )}
+            {newChallenge && <p className="msg ok">🏆 Challenge cleared!</p>}
+            {discover && <p className="msg">Nice work learning the notes. Try Flow mode to earn stars.</p>}
+            {!discover && !outcome.completed && (
+              <p className="msg warn">
+                Hit at least {Math.round(level.completion.minNoteAccuracy * 100)}% of the notes to complete the level. Discover mode
+                lets you learn them at your own pace.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="stat-grid">
           <div className="stat">
@@ -74,16 +106,40 @@ export function ResultsScreen({ title, results, previousBest, onRetry, onMenu }:
             <span>Wrong / extra notes</span>
             <b>{results.wrongNotes}</b>
           </li>
+          {results.holds.total > 0 && (
+            <li className="j-hold">
+              <span>Long notes held</span>
+              <b>
+                {results.holds.full} / {results.holds.total}
+              </b>
+            </li>
+          )}
+          {results.partialChords > 0 && (
+            <li className="j-wrong">
+              <span>Partial chords</span>
+              <b>{results.partialChords}</b>
+            </li>
+          )}
         </ul>
 
         {advice && <p className="small muted center">{advice}</p>}
 
         <div className="overlay-actions">
-          <button className="btn btn-primary" onClick={onRetry} autoFocus>
+          {canGoNext && (
+            <button className="btn btn-primary" onClick={onNext} autoFocus>
+              Next level: {nextLevel.title} →
+            </button>
+          )}
+          {discover && (
+            <button className="btn btn-primary" onClick={() => onPlayMode('flow')} autoFocus={!canGoNext}>
+              ▶ Play in Flow mode
+            </button>
+          )}
+          <button className={`btn ${canGoNext || discover ? 'btn-secondary' : 'btn-primary'}`} onClick={onRetry} autoFocus={!canGoNext && !discover}>
             ↻ Play again
           </button>
           <button className="btn btn-ghost" onClick={onMenu}>
-            Main menu
+            Level select
           </button>
         </div>
       </section>

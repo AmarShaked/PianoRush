@@ -1,13 +1,18 @@
+/** `user`: the player paused (input ignored). `wait`: Discover mode is waiting for notes (input accepted). */
+export type PauseKind = 'user' | 'wait';
+
 interface PauseInterval {
+  readonly kind: PauseKind;
   readonly from: number;
-  /** Clock time playback continues; Infinity while still paused with no resume scheduled. */
+  /** Clock time playback continues; Infinity while open. */
   to: number;
 }
 
 /**
  * Maps a monotonic clock (ms, e.g. performance.now() or — later — an
  * audio-clock-derived time) onto song time (ms relative to beat 0; negative
- * during the count-in). Handles pause and a frozen countdown after resume.
+ * during the count-in). Handles user pauses, a frozen countdown after resume,
+ * and Discover-mode waits.
  *
  * Song time is a pure function of clock time + pause history, so it never
  * depends on how often (or how late) anyone asks for it: an input event
@@ -24,16 +29,23 @@ export class Transport {
     return this.started;
   }
 
-  /** Paused (including a scheduled-but-not-yet-reached resume) at this clock time? */
+  /** Frozen for any reason at this clock time? */
   isPausedAt(clock: number): boolean {
-    const last = this.pauses[this.pauses.length - 1];
-    return last !== undefined && clock >= last.from && clock < last.to;
+    return this.intervalAt(clock) !== null;
   }
 
-  /** Clock time at which a scheduled resume completes, or null. */
+  isUserPausedAt(clock: number): boolean {
+    return this.intervalAt(clock)?.kind === 'user';
+  }
+
+  isWaitingAt(clock: number): boolean {
+    return this.intervalAt(clock)?.kind === 'wait';
+  }
+
+  /** Clock time at which a scheduled resume (from a user pause) completes, or null. */
   pendingResumeAt(clock: number): number | null {
-    const last = this.pauses[this.pauses.length - 1];
-    if (!last || !Number.isFinite(last.to) || clock >= last.to) return null;
+    const last = this.last();
+    if (!last || last.kind !== 'user' || !Number.isFinite(last.to) || clock >= last.to) return null;
     return last.to;
   }
 
@@ -48,20 +60,28 @@ export class Transport {
     this.pauses.length = 0;
   }
 
-  pause(clock: number): void {
+  pause(clock: number, kind: PauseKind = 'user'): void {
     if (!this.started) return;
-    const last = this.pauses[this.pauses.length - 1];
+    const last = this.last();
+    if (last && Number.isFinite(last.to) && clock < last.to && kind === 'wait') {
+      clock = last.to; // a wait can only begin once the previous interval has ended
+    }
     if (last && clock < last.to) {
-      // Already paused, or pausing during the resume countdown: stay paused.
-      last.to = Infinity;
+      if (last.kind === kind) {
+        last.to = Infinity; // already paused (or pausing during the resume countdown)
+      } else if (kind === 'user') {
+        // The player pauses while Discover is waiting: end the wait, start a user pause.
+        last.to = Math.max(clock, last.from);
+        this.pauses.push({ kind, from: last.to, to: Infinity });
+      }
       return;
     }
-    this.pauses.push({ from: clock, to: Infinity });
+    this.pauses.push({ kind, from: clock, to: Infinity });
   }
 
-  /** Continue playback at `clock + delayMs`; song time stays frozen until then. */
+  /** Continue at `clock + delayMs`; song time stays frozen until then. */
   resume(clock: number, delayMs = 0): void {
-    const last = this.pauses[this.pauses.length - 1];
+    const last = this.last();
     if (!last || last.to !== Infinity) return;
     last.to = Math.max(clock + Math.max(0, delayMs), last.from);
   }
@@ -75,12 +95,22 @@ export class Transport {
     return clock - this.startClock - paused - this.countInMs;
   }
 
-  /** True if an event at `clock` happened while the song was running. */
-  isRunningAt(clock: number): boolean {
+  /** True if input at `clock` should be processed (running, or waiting for notes). */
+  acceptsInputAt(clock: number): boolean {
     if (!this.started || clock < this.startClock) return false;
-    for (const p of this.pauses) {
-      if (clock >= p.from && clock < p.to) return false;
+    return this.intervalAt(clock)?.kind !== 'user';
+  }
+
+  private last(): PauseInterval | undefined {
+    return this.pauses[this.pauses.length - 1];
+  }
+
+  private intervalAt(clock: number): PauseInterval | null {
+    for (let i = this.pauses.length - 1; i >= 0; i--) {
+      const p = this.pauses[i]!;
+      if (clock >= p.from && clock < p.to) return p;
+      if (p.to <= clock) break;
     }
-    return true;
+    return null;
   }
 }

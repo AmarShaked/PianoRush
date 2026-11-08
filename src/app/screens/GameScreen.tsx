@@ -5,11 +5,16 @@ import { DEFAULT_KEY_MAP } from '../../piano-input/KeyboardSimulator';
 import { MIDDLE_C, midiToNoteName, midiToPitchClass } from '../../piano-input/noteNames';
 import type { PianoInputSource } from '../../piano-input/types';
 import type { CompiledSong } from '../../song-content/compile';
+import type { GameMode, LevelDefinition } from '../../song-content/level';
 import { GameSession, type SessionNotice } from '../GameSession';
-import { TIMING_PRESETS, type Settings } from '../storage';
+import { CHALLENGE_WINDOWS, TIMING_PRESETS, type Settings } from '../storage';
+
+export const MODE_LABEL: Record<GameMode, string> = { discover: 'Discover', flow: 'Flow', challenge: 'Challenge' };
 
 interface GameScreenProps {
+  level: LevelDefinition;
   song: CompiledSong;
+  mode: GameMode;
   inputs: readonly PianoInputSource[];
   settings: Settings;
   onFinished: (results: GameResults) => void;
@@ -21,7 +26,7 @@ const HUD_HEIGHT = 64;
 /** `?debug` in the URL shows an FPS / timing readout for real-device testing. */
 const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
 
-export function GameScreen({ song, inputs, settings, onFinished, onQuit }: GameScreenProps) {
+export function GameScreen({ level, song, mode, inputs, settings, onFinished, onQuit }: GameScreenProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const scoreRef = useRef<HTMLSpanElement>(null);
   const comboRef = useRef<HTMLSpanElement>(null);
@@ -43,7 +48,11 @@ export function GameScreen({ song, inputs, settings, onFinished, onQuit }: GameS
     const session = new GameSession({
       song,
       inputs,
-      engineConfig: { windows: TIMING_PRESETS[settings.timingPreset].windows, inputOffsetMs: settings.inputOffsetMs },
+      engineConfig: {
+        windows: mode === 'challenge' ? CHALLENGE_WINDOWS : TIMING_PRESETS[settings.timingPreset].windows,
+        inputOffsetMs: settings.inputOffsetMs,
+        waitForNotes: mode === 'discover',
+      },
     });
     sessionRef.current = session;
     // Dev-only hook for automated browser tests (stripped from production builds).
@@ -61,7 +70,9 @@ export function GameScreen({ song, inputs, settings, onFinished, onQuit }: GameS
     }));
 
     const offEngine = session.engine.on((e) => {
-      if (e.type === 'judgment') renderer?.triggerJudgment(e.note.lane, e.judgment, e.offsetMs);
+      if (e.type === 'note') renderer?.triggerNote(e.note.lane, e.judgment);
+      else if (e.type === 'judgment') renderer?.showJudgment(e.judgment, e.offsetMs, e.event.partial);
+      else if (e.type === 'hold') renderer?.triggerHold(e.note.lane, e.result);
       else if (e.type === 'wrongNote') renderer?.triggerWrongNote(e.lane);
       else if (e.type === 'state') {
         setState(e.state);
@@ -158,7 +169,7 @@ export function GameScreen({ song, inputs, settings, onFinished, onQuit }: GameS
       renderer?.destroy();
       sessionRef.current = null;
     };
-  }, [song, inputs, settings]);
+  }, [song, mode, inputs, settings]);
 
   const session = sessionRef.current;
   const paused = state === 'paused';
@@ -169,7 +180,10 @@ export function GameScreen({ song, inputs, settings, onFinished, onQuit }: GameS
 
       <header className="hud" style={{ height: HUD_HEIGHT }}>
         <div className="hud-left">
-          <div className="hud-title">{song.definition.title}</div>
+          <div className="hud-title">
+            <span className={`mode-badge mode-${mode}`}>{MODE_LABEL[mode]}</span>
+            {level.number}. {level.title}
+          </div>
           <div className="progress" role="progressbar" aria-label="Level progress">
             <div className="progress-fill" ref={progressRef} />
           </div>
@@ -214,6 +228,9 @@ export function GameScreen({ song, inputs, settings, onFinished, onQuit }: GameS
         <div className="overlay">
           <div className="card overlay-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
             <h2 id="pause-title">Paused</h2>
+            <p className="muted small">
+              {level.title} · {MODE_LABEL[mode]}
+            </p>
             {notice?.type === 'device-disconnected' && (
               <div className="notice warn" role="alert">
                 <strong>“{notice.deviceName}” disconnected.</strong>

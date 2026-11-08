@@ -1,4 +1,4 @@
-# Manual test checklist (M1)
+# Manual test checklist (M1 + M2)
 
 Record the browser, OS, piano model and connection type for each run. Tick only what you actually tested.
 
@@ -39,10 +39,23 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] Switching browser tabs pauses the game
 - [ ] The level ends on its own and the results screen appears
 
+## Levels, modes and progression (M2)
+- [ ] On a fresh profile only level 1 is playable. Other tiles show 🔒 and Play is disabled with an explanation
+- [ ] Finishing level 1 in Flow with ≥50% accuracy shows stars, "Level 2 unlocked!" and **Next level**
+- [ ] Finishing below 50% shows "Keep practising" and does not unlock anything
+- [ ] Stars and best scores appear on the level tiles, and the ★ total in the header adds up
+- [ ] Reloading the page keeps the progress and selects the next unfinished level
+- [ ] **Discover:** the song stops with each tile on the line, shows "PLAY C4", and highlights the key. A wrong key flashes red and the song keeps waiting. The right key continues the song. The results show no stars
+- [ ] Pausing during a Discover wait and resuming goes straight back to waiting
+- [ ] **Challenge:** noticeably stricter (±40 ms Perfect). Completing it shows "🏆 Challenge cleared!" and a trophy on the tile
+- [ ] **Hold It (6):** holding long notes to the end shows "HOLD!". Releasing early shows "RELEASED EARLY" and the rest of the tile greys out. The results show "Long notes held x / y"
+- [ ] **Memory Challenge (9):** the second statement of each phrase disappears before the line. The first statement is fully visible
+- [ ] One-key and two-key levels (1, 2) lay out correctly with the MIDDLE C marker
+
 ## Results
 - [ ] Score, stars, note accuracy, timing accuracy, Perfect/Great/Good/Miss counts, wrong notes and max combo are shown
 - [ ] "New best!" appears the first time, and the personal best appears later
-- [ ] **Play again** starts a new run without reloading. **Main menu** returns to the start screen
+- [ ] **Play again** starts a new run without reloading. **Level select** returns to the home screen
 
 ## Performance and timing (real hardware)
 - [ ] With `?debug`, the FPS readout stays around 60 during play

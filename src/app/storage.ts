@@ -1,4 +1,6 @@
 /** Small, defensive localStorage wrapper (private mode / blocked storage must never break the game). */
+import type { ProgressMap } from '../game-engine/progression';
+import type { GameMode } from '../song-content/level';
 
 export type TimingPreset = 'relaxed' | 'standard' | 'strict';
 
@@ -10,13 +12,14 @@ export interface Settings {
   /** Positive = your input arrives late; subtracted from input timestamps. */
   inputOffsetMs: number;
   lastMidiDeviceId: string | null;
+  preferredMode: GameMode;
 }
 
 const KEY = 'piano-rush:v1';
 
 interface Stored {
   settings?: Partial<Settings>;
-  bestScores?: Record<string, number>;
+  progress?: ProgressMap;
 }
 
 function prefersReducedMotion(): boolean {
@@ -34,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   timingPreset: 'standard',
   inputOffsetMs: 0,
   lastMidiDeviceId: null,
+  preferredMode: 'flow',
 };
 
 function read(): Stored {
@@ -61,16 +65,12 @@ export function saveSettings(settings: Settings): void {
   write({ ...read(), settings });
 }
 
-export function getBestScore(songId: string): number {
-  return read().bestScores?.[songId] ?? 0;
+export function loadProgress(): ProgressMap {
+  return read().progress ?? {};
 }
 
-/** Records the score if it is a new best; returns the previous best. */
-export function recordScore(songId: string, score: number): number {
-  const data = read();
-  const previous = data.bestScores?.[songId] ?? 0;
-  if (score > previous) write({ ...data, bestScores: { ...data.bestScores, [songId]: score } });
-  return previous;
+export function saveProgress(progress: ProgressMap): void {
+  write({ ...read(), progress });
 }
 
 export const TIMING_PRESETS: Record<TimingPreset, { label: string; windows: { perfect: number; great: number; good: number } }> = {
@@ -78,3 +78,6 @@ export const TIMING_PRESETS: Record<TimingPreset, { label: string; windows: { pe
   standard: { label: 'Standard', windows: { perfect: 60, great: 130, good: 220 } },
   strict: { label: 'Strict', windows: { perfect: 40, great: 90, good: 150 } },
 };
+
+/** Challenge mode always uses strict windows, whatever the timing preference. */
+export const CHALLENGE_WINDOWS = TIMING_PRESETS.strict.windows;

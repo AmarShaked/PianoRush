@@ -221,12 +221,12 @@ describe('duplicate, repeated and overlapping input', () => {
     expect(engine.handleInput(on(C, clockAtBeat(1)))?.judgment).toBe('perfect');
   });
 
-  it('matches simultaneous notes on different pitches independently', () => {
+  it('matches each key of simultaneous notes independently', () => {
     const engine = started([[C, 0], [E, 0], [G, 0]]);
     expect(engine.handleInput(on(E, clockAtBeat(0) + 10))?.judgment).toBe('perfect');
     expect(engine.handleInput(on(C, clockAtBeat(0) + 70))?.judgment).toBe('great');
     expect(engine.handleInput(on(G, clockAtBeat(0) - 5))?.judgment).toBe('perfect');
-    expect(engine.getSnapshot(0).combo).toBe(3);
+    expect(engine.getSnapshot(0).notes.every((n) => n.status === 'hit')).toBe(true);
   });
 
   it('handles overlapping held notes (legato) without interference', () => {
@@ -363,7 +363,6 @@ describe('state machine, completion and restart', () => {
     expect(r.score).toBe(100 + 75 + 40);
     expect(r.maxCombo).toBe(3);
     expect(r.meanOffsetMs).toBeCloseTo(-100 / 3);
-    expect(r.stars).toBe(1);
   });
 
   it('ignores input after the level has finished', () => {

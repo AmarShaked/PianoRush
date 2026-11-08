@@ -37,10 +37,3 @@ export function timingAccuracy(c: JudgmentCounts): number {
     (c.perfect * TIMING_WEIGHT.perfect + c.great * TIMING_WEIGHT.great + c.good * TIMING_WEIGHT.good) / total
   );
 }
-
-/** PRD star rule: 1 = completed, 2 = ≥80 % note accuracy, 3 = ≥95 %. */
-export function starsFor(noteAcc: number): 1 | 2 | 3 {
-  if (noteAcc >= 0.95) return 3;
-  if (noteAcc >= 0.8) return 2;
-  return 1;
-}
