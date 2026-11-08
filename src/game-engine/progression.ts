@@ -41,8 +41,8 @@ type LevelRules = Pick<LevelDefinition, 'completion' | 'stars'>;
  * (thresholds come from the level). Discover runs and slowed-down runs are
  * practice: no stars, no unlock.
  */
-export function evaluateRun(level: LevelRules, results: GameResults, mode: GameMode, speed = 1): RunOutcome {
-  if (mode === 'discover' || speed < 1) return { mode, speed, completed: false, stars: 0, ranked: false };
+export function evaluateRun(level: LevelRules, results: GameResults, mode: GameMode, speed = 1, practice = false): RunOutcome {
+  if (mode === 'discover' || speed < 1 || practice) return { mode, speed, completed: false, stars: 0, ranked: false };
   const acc = results.noteAccuracy;
   const completed = acc >= level.completion.minNoteAccuracy;
   const stars: StarCount = !completed ? 0 : acc >= level.stars.three ? 3 : acc >= level.stars.two ? 2 : 1;

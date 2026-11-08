@@ -7,7 +7,8 @@ export type TimingPreset = 'relaxed' | 'standard' | 'strict';
 export interface Settings {
   keyboardSimulator: boolean;
   showKeyHints: boolean;
-  reducedMotion: boolean;
+  /** Visual effects intensity: full, reduced (no particles / pulses), or minimal (feedback only). */
+  visualEffects: VisualEffects;
   timingPreset: TimingPreset;
   /** Positive = your input arrives late; subtracted from input timestamps. */
   inputOffsetMs: number;
@@ -18,6 +19,12 @@ export interface Settings {
   backingVolume: number;
   pianoVolume: number;
   metronomeVolume: number;
+  effectsVolume: number;
+  /**
+   * Input offsets calibrated per device configuration
+   * ("<input>|<wired|wireless output>"); `inputOffsetMs` is the default.
+   */
+  calibrations: Record<string, number>;
   /** Click on every beat during the song (the count-in always clicks). */
   metronome: boolean;
   /** Tempo factor for the next run (1 = full speed; slower runs are practice). */
@@ -31,6 +38,7 @@ export interface Settings {
 }
 
 export type PianoOutput = 'auto' | 'physical' | 'virtual';
+export type VisualEffects = 'full' | 'reduced' | 'minimal';
 
 const KEY = 'piano-rush:v1';
 
@@ -50,7 +58,7 @@ function prefersReducedMotion(): boolean {
 export const DEFAULT_SETTINGS: Settings = {
   keyboardSimulator: true,
   showKeyHints: true,
-  reducedMotion: false,
+  visualEffects: 'full',
   timingPreset: 'standard',
   inputOffsetMs: 0,
   lastMidiDeviceId: null,
@@ -59,6 +67,8 @@ export const DEFAULT_SETTINGS: Settings = {
   backingVolume: 0.8,
   pianoVolume: 0.9,
   metronomeVolume: 0.6,
+  effectsVolume: 0.35,
+  calibrations: {},
   metronome: false,
   practiceSpeed: 1,
   showNoteLabels: true,
@@ -84,7 +94,13 @@ function write(data: Stored): void {
 }
 
 export function loadSettings(): Settings {
-  return { ...DEFAULT_SETTINGS, reducedMotion: prefersReducedMotion(), ...read().settings };
+  const stored = read().settings as (Partial<Settings> & { reducedMotion?: boolean }) | undefined;
+  const legacyReduced = stored?.reducedMotion === true;
+  return {
+    ...DEFAULT_SETTINGS,
+    visualEffects: prefersReducedMotion() || legacyReduced ? 'reduced' : 'full',
+    ...stored,
+  };
 }
 
 export function saveSettings(settings: Settings): void {

@@ -8,3 +8,4 @@ export * from './keyFinding';
 export * from './pitch';
 export * from './PitchTracker';
 export * from './MicrophoneInput';
+export * from './NativeMidiBridge';

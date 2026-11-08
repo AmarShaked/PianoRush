@@ -1,4 +1,5 @@
 import { compileSong, type CompiledSong } from '../song-content/compile';
+import { sliceSong } from '../song-content/practice';
 import type { LevelDefinition, WorldDefinition } from '../song-content/level';
 import { HITS } from '../song-content/levels/hits';
 import { WORLD_1 } from '../song-content/levels/world1';
@@ -49,6 +50,26 @@ export function songFor(level: LevelDefinition, speed = 1): CompiledSong {
   let song = compiled.get(key);
   if (!song) {
     song = compileSong(speed === 1 ? level.song : { ...level.song, bpm: level.song.bpm * speed });
+    compiled.set(key, song);
+  }
+  return song;
+}
+
+/** A looped practice section of a level (PRD §7.4). */
+export interface PracticeSection {
+  readonly fromBeat: number;
+  readonly toBeat: number;
+  readonly firstBar: number;
+  readonly lastBar: number;
+  readonly repeats: number;
+}
+
+export function sectionSongFor(level: LevelDefinition, section: PracticeSection, speed = 1): CompiledSong {
+  const key = `${level.id}@${speed}#${section.fromBeat}-${section.toBeat}x${section.repeats}`;
+  let song = compiled.get(key);
+  if (!song) {
+    const sliced = sliceSong(level.song, section.fromBeat, section.toBeat, section.repeats);
+    song = compileSong(speed === 1 ? sliced : { ...sliced, bpm: sliced.bpm * speed });
     compiled.set(key, song);
   }
   return song;

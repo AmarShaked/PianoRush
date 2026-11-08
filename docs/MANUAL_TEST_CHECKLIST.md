@@ -1,4 +1,4 @@
-# Manual test checklist (M1–M4)
+# Manual test checklist
 
 Record the browser, OS, piano model and connection type for each run. Tick only what you actually tested.
 
@@ -19,6 +19,21 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] Off the Beat: the syncopated notes (starting between beats) feel natural with the beat
 - [ ] Rhythm Memory: the repeated phrases fade before the line
 - [ ] The harmonies under Lightly Row, Hot Cross Buns and Go Tell Aunt Rhody sound right
+
+## Worlds 3–6
+- [ ] World 3: black-key lanes look like black keys, B♭ is spelled as a flat in level 6, and Für Elise's D♯ and G♯ fall where they are on the piano
+- [ ] The hand-shift level (W3-5) moves comfortably from C to G position
+- [ ] World 4: everything is played with the left hand from C3. Finger numbers read 5-4-3-2-1, LOW C is marked, and the band doesn't crowd the low register
+- [ ] World 5: chord tiles are joined by a bar. In Discover, the song waits until all keys of a chord are down. From level 4 the band plays the tune (you play the chords), and it sounds right together
+- [ ] World 6: LEFT HAND / RIGHT HAND labels and a divider appear, both hands are playable at once on a real piano, and there is no band bass under your left hand
+
+## Microphone (beta), practice, effects, calibration
+- [ ] Microphone with an acoustic (or digital, through speakers) piano: single notes are recognized with the right names in Diagnostics. Repeated notes on one key register each time. Wear headphones while playing
+- [ ] After calibrating with the mic, World 1 plays fairly
+- [ ] Practice a section loops the chosen bars 3×, the repeated-phrase hint makes sense, and the results say "Section practice" with no stars
+- [ ] Sound effects are audible but subtle, and the slider at 0 silences them
+- [ ] Visual effects Minimal removes bursts and combo, but keeps judgments and wrong-key flashes
+- [ ] Calibrating with two different devices stores two entries under Settings → Calibrated devices, and each is used with its own device
 
 ## Practice speed, labels, offline (M4)
 - [ ] The 50% and 75% speeds slow the tiles, judging and backing together. The results say "Practice", with no stars and no unlocks

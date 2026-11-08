@@ -8,6 +8,7 @@ import type { CompiledSong } from '../../song-content/compile';
 import type { GameMode, LevelDefinition } from '../../song-content/level';
 import { BackingPlayer } from '../../audio-engine/BackingPlayer';
 import { GameSession, type SessionNotice } from '../GameSession';
+import type { PracticeSection } from '../catalog';
 import { audioEngine } from '../inputs';
 import { CHALLENGE_WINDOWS, TIMING_PRESETS, type Settings } from '../storage';
 
@@ -19,6 +20,8 @@ interface GameScreenProps {
   mode: GameMode;
   /** Practice speed (1 = full tempo). */
   speed: number;
+  /** Looping a section for practice. */
+  section?: PracticeSection | null;
   inputs: readonly PianoInputSource[];
   settings: Settings;
   /** Play the built-in piano for the player's keys (virtual piano mode). */
@@ -35,7 +38,7 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 /** Lead time before the count-in so the first click can be queued on time (plus device latency). */
 const startDelayMs = () => 250 + audioEngine.totalLatency * 1000;
 
-export function GameScreen({ level, song, mode, speed, inputs, settings, virtualPiano, onFinished, onQuit }: GameScreenProps) {
+export function GameScreen({ level, song, mode, speed, section = null, inputs, settings, virtualPiano, onFinished, onQuit }: GameScreenProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const scoreRef = useRef<HTMLSpanElement>(null);
   const comboRef = useRef<HTMLSpanElement>(null);
@@ -90,9 +93,16 @@ export function GameScreen({ level, song, mode, speed, inputs, settings, virtual
 
     const offEngine = session.engine.on((e) => {
       if (e.type === 'note') renderer?.triggerNote(e.note.lane, e.judgment);
-      else if (e.type === 'judgment') renderer?.showJudgment(e.judgment, e.offsetMs, e.event.partial);
-      else if (e.type === 'hold') renderer?.triggerHold(e.note.lane, e.result);
-      else if (e.type === 'wrongNote') renderer?.triggerWrongNote(e.lane);
+      else if (e.type === 'judgment') {
+        renderer?.showJudgment(e.judgment, e.offsetMs, e.event.partial);
+        audioEngine.playEffect(e.judgment);
+      } else if (e.type === 'hold') {
+        renderer?.triggerHold(e.note.lane, e.result);
+        if (e.result === 'full') audioEngine.playEffect('hold');
+      } else if (e.type === 'wrongNote') {
+        renderer?.triggerWrongNote(e.lane);
+        audioEngine.playEffect('wrong');
+      }
       else if (e.type === 'state') {
         setState(e.state);
         if (e.state === 'finished') {
@@ -105,7 +115,12 @@ export function GameScreen({ level, song, mode, speed, inputs, settings, virtual
     const offNotice = session.onNotice(setNotice);
 
     // Audio: accompaniment follows the engine's song time; the built-in piano plays the player's keys.
-    audioEngine.setVolumes({ backing: settings.backingVolume, piano: settings.pianoVolume, metronome: settings.metronomeVolume });
+    audioEngine.setVolumes({
+      backing: settings.backingVolume,
+      piano: settings.pianoVolume,
+      metronome: settings.metronomeVolume,
+      effects: settings.effectsVolume,
+    });
     const backing = new BackingPlayer(audioEngine, session.engine, song, () => performance.now(), { metronome: settings.metronome });
     const offPiano = virtualPiano
       ? inputs.map((input) =>
@@ -150,7 +165,8 @@ export function GameScreen({ level, song, mode, speed, inputs, settings, virtual
       totalBeats: song.totalBeats,
       countInBeats: def.countInBeats,
       beatsPerBar: def.timeSignature[0],
-      reducedMotion: settings.reducedMotion,
+      reducedMotion: settings.visualEffects !== 'full',
+      minimalEffects: settings.visualEffects === 'minimal',
       showKeyHints: settings.keyboardSimulator && settings.showKeyHints,
       showTileLabels: settings.showNoteLabels,
       topInset: HUD_HEIGHT,
@@ -217,6 +233,11 @@ export function GameScreen({ level, song, mode, speed, inputs, settings, virtual
           <div className="hud-title">
             <span className={`mode-badge mode-${mode}`}>{MODE_LABEL[mode]}</span>
             {speed < 1 && <span className="mode-badge speed-badge">{Math.round(speed * 100)}%</span>}
+            {section && (
+              <span className="mode-badge speed-badge">
+                Bars {section.firstBar}–{section.lastBar} ×{section.repeats}
+              </span>
+            )}
             {level.world > 0 ? `${level.number}. ` : ''}
             {level.title}
           </div>

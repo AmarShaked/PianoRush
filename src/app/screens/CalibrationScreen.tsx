@@ -7,6 +7,8 @@ interface CalibrationScreenProps {
   inputs: readonly PianoInputSource[];
   keyboardSimulatorEnabled: boolean;
   currentOffsetMs: number;
+  /** Which device configuration the result is saved for. */
+  configLabel: string;
   onApply: (offsetMs: number) => void;
   onBack: () => void;
 }
@@ -23,7 +25,7 @@ type Phase = { name: 'idle' } | { name: 'running'; heard: number; taps: number }
  * what matters for play — sound-to-key timing through this device — rather
  * than reaction time, because the beat is predictable.
  */
-export function CalibrationScreen({ inputs, keyboardSimulatorEnabled, currentOffsetMs, onApply, onBack }: CalibrationScreenProps) {
+export function CalibrationScreen({ inputs, keyboardSimulatorEnabled, currentOffsetMs, configLabel, onApply, onBack }: CalibrationScreenProps) {
   const [phase, setPhase] = useState<Phase>({ name: 'idle' });
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const cancel = useRef<() => void>(() => undefined);
@@ -91,6 +93,7 @@ export function CalibrationScreen({ inputs, keyboardSimulatorEnabled, currentOff
       <section className="card results-card" aria-labelledby="cal-title">
         <div className="eyebrow">Settings</div>
         <h2 id="cal-title">Timing calibration</h2>
+        <p className="small muted">Saved for: <b>{configLabel}</b></p>
         <p className="muted">
           You'll hear 4 count-in clicks, then {CLICKS} more. On each of the {CLICKS}, play any key on your piano (or A S D F G) exactly with the
           click. Listen rather than watch — close your eyes if it helps.
@@ -122,7 +125,7 @@ export function CalibrationScreen({ inputs, keyboardSimulatorEnabled, currentOff
                 </dd>
                 <dt>Consistency</dt>
                 <dd>±{Math.round(result.spreadMs ?? 0)} ms over {result.offsets.length} taps</dd>
-                <dt>Current input offset</dt>
+                <dt>Current offset for this setup</dt>
                 <dd>{currentOffsetMs} ms</dd>
               </dl>
             )}

@@ -1,12 +1,14 @@
 import type { BackingNote } from './arranger';
 import { ClockSync } from './ClockSync';
-import { bass, clap, click, crash, hat, keys, kick, lead, openHat, pad, piano, snare, synthBass, type Voice } from './synth';
+import { bass, clap, click, crash, effect, hat, keys, kick, lead, openHat, pad, piano, snare, synthBass, type EffectKind, type Voice } from './synth';
 
 export interface Volumes {
   /** 0..1 */
   readonly backing: number;
   readonly piano: number;
   readonly metronome: number;
+  /** Game sound effects (hits, misses). */
+  readonly effects: number;
 }
 
 export interface LatencyInfo {
@@ -37,7 +39,7 @@ export class AudioEngine {
   private syncTimer: ReturnType<typeof setInterval> | null = null;
   private readonly backingVoices = new Set<Voice>();
   private readonly pianoVoices = new Map<number, Voice>();
-  private volumes: Volumes = { backing: 0.8, piano: 0.9, metronome: 0.6 };
+  private volumes: Volumes = { backing: 0.8, piano: 0.9, metronome: 0.6, effects: 0.35 };
   /** Count of notes scheduled since creation (diagnostics / tests). */
   scheduledCount = 0;
 
@@ -75,7 +77,7 @@ export class AudioEngine {
         g.connect(this.master);
         return g;
       };
-      this.buses = { backing: bus(), piano: bus(), metronome: bus() };
+      this.buses = { backing: bus(), piano: bus(), metronome: bus(), effects: bus() };
       this.applyVolumes();
       this.syncTimer = setInterval(() => this.updateSync(), 100);
     }
@@ -189,6 +191,13 @@ export class AudioEngine {
     this.backingVoices.clear();
   }
 
+  /** Play a game sound effect now (no-op when the effects volume is 0). */
+  playEffect(kind: EffectKind): void {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running' || this.volumes.effects <= 0) return;
+    effect(ctx, this.buses.effects, ctx.currentTime, kind);
+  }
+
   pianoNoteOn(midi: number, velocity: number): void {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return;
@@ -240,6 +249,7 @@ export class AudioEngine {
     this.buses.backing.gain.value = curve(this.volumes.backing) * 0.45;
     this.buses.piano.gain.value = curve(this.volumes.piano);
     this.buses.metronome.gain.value = curve(this.volumes.metronome) * 0.7;
+    this.buses.effects.gain.value = curve(this.volumes.effects) * 0.6;
     this.master.gain.value = 0.9;
   }
 

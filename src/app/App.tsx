@@ -10,9 +10,10 @@ import {
 } from '../game-engine/progression';
 import type { GameMode, LevelDefinition } from '../song-content/level';
 import type { PianoInputSource } from '../piano-input/types';
-import { COLLECTIONS, collectionOf, isPlayable, LEVELS, nextInOrder, songFor } from './catalog';
-import { audioEngine, keyboardSimulator, microphoneInput, midiManager } from './inputs';
+import { COLLECTIONS, collectionOf, isPlayable, LEVELS, nextInOrder, sectionSongFor, songFor, type PracticeSection } from './catalog';
+import { audioEngine, keyboardSimulator, microphoneInput, midiManager, nativeMidi } from './inputs';
 import { useMic } from './useMic';
+import { configKey, describeConfig, offsetFor } from './calibrationKeys';
 import { loadProgress, loadSettings, saveProgress, saveSettings, type Settings } from './storage';
 import { useMidi } from './useMidi';
 import { HomeScreen } from './screens/HomeScreen';
@@ -22,7 +23,7 @@ import { DiagnosticsScreen } from './screens/DiagnosticsScreen';
 import { CalibrationScreen } from './screens/CalibrationScreen';
 import { SetupScreen, type SetupStep } from './screens/SetupScreen';
 
-const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator, microphoneInput];
+const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator, microphoneInput, nativeMidi];
 const FIRST_LEVEL = LEVELS[0]!;
 
 type Screen =
@@ -33,6 +34,7 @@ type Screen =
       readonly level: LevelDefinition;
       readonly mode: GameMode;
       readonly speed: number;
+      readonly section: PracticeSection | null;
       readonly settings: Settings;
       readonly virtualPiano: boolean;
     }
@@ -41,6 +43,7 @@ type Screen =
       readonly level: LevelDefinition;
       readonly mode: GameMode;
       readonly speed: number;
+      readonly section: PracticeSection | null;
       readonly results: GameResults;
       readonly outcome: RunOutcome;
       readonly update: ProgressUpdate;
@@ -68,6 +71,9 @@ export function App() {
 
   const midi = useMidi(midiManager, settings.lastMidiDeviceId);
   const mic = useMic();
+  // Native app wrappers (iOS/Android) feed MIDI through window.PianoRushNative.
+  const [nativeDevices, setNativeDevices] = useState<string[]>(nativeMidi.isActive ? nativeMidi.deviceNames : []);
+  useEffect(() => nativeMidi.onChange(() => setNativeDevices(nativeMidi.deviceNames)), []);
 
   // Remember the chosen device so returning players reconnect automatically.
   useEffect(() => {
@@ -83,30 +89,31 @@ export function App() {
   }, [gameSimEnabled]);
 
   const startLevel = useCallback(
-    (level: LevelDefinition, mode: GameMode, speed: number = settings.practiceSpeed) => {
+    (level: LevelDefinition, mode: GameMode, speed: number = settings.practiceSpeed, section: PracticeSection | null = null) => {
       // Always called from a click: the moment browsers allow audio to start.
       audioEngine.unlock();
       // Auto: built-in piano only when nothing else makes sound (never on top of an acoustic piano).
       const virtualPiano =
         settings.pianoOutput === 'virtual' ||
-        (settings.pianoOutput === 'auto' && !midiManager.isListening && microphoneInput.status !== 'listening');
+        (settings.pianoOutput === 'auto' && !midiManager.isListening && !nativeMidi.isActive && microphoneInput.status !== 'listening');
       setSelected(level);
       setRun((r) => r + 1);
       // Settings are frozen for the duration of a run.
-      setScreen({ name: 'game', run: run + 1, level, mode, speed, settings, virtualPiano });
+      // The input offset comes from this device configuration's calibration (PRD §6.4).
+      setScreen({ name: 'game', run: run + 1, level, mode, speed, section, settings: { ...settings, inputOffsetMs: offsetFor(settings) }, virtualPiano });
     },
     [run, settings],
   );
 
   const finish = useCallback(
-    (level: LevelDefinition, mode: GameMode, speed: number, results: GameResults) => {
-      const outcome = evaluateRun(level, results, mode, speed);
+    (level: LevelDefinition, mode: GameMode, speed: number, section: PracticeSection | null, results: GameResults) => {
+      const outcome = evaluateRun(level, results, mode, speed, section !== null);
       // Free-play songs never unlock anything: merge them as a list of one.
       const list = collectionOf(level).kind === 'path' ? LEVELS : [level];
       const update = applyRun(list, progress, level.id, outcome, results.score);
       setProgress(update.progress);
       saveProgress(update.progress);
-      setScreen({ name: 'results', level, mode, speed, results, outcome, update });
+      setScreen({ name: 'results', level, mode, speed, section, results, outcome, update });
     },
     [progress],
   );
@@ -120,13 +127,14 @@ export function App() {
         <GameScreen
           key={screen.run}
           level={screen.level}
-          song={songFor(screen.level, screen.speed)}
+          song={screen.section ? sectionSongFor(screen.level, screen.section, screen.speed) : songFor(screen.level, screen.speed)}
+          section={screen.section}
           mode={screen.mode}
           speed={screen.speed}
           inputs={INPUTS}
           settings={screen.settings}
           virtualPiano={screen.virtualPiano}
-          onFinished={(results) => finish(screen.level, screen.mode, screen.speed, results)}
+          onFinished={(results) => finish(screen.level, screen.mode, screen.speed, screen.section, results)}
           onQuit={toHome}
         />
       );
@@ -142,7 +150,8 @@ export function App() {
           update={screen.update}
           nextLevel={nextLevel}
           speed={screen.speed}
-          onRetry={() => startLevel(screen.level, screen.mode, screen.speed)}
+          section={screen.section}
+          onRetry={() => startLevel(screen.level, screen.mode, screen.speed, screen.section)}
           onPlayMode={(m, sp) => {
             updateSettings({ preferredMode: m, practiceSpeed: sp });
             startLevel(screen.level, m, sp);
@@ -170,9 +179,10 @@ export function App() {
         <CalibrationScreen
           inputs={INPUTS}
           keyboardSimulatorEnabled={settings.keyboardSimulator}
-          currentOffsetMs={settings.inputOffsetMs}
+          currentOffsetMs={offsetFor(settings)}
+          configLabel={describeConfig(configKey())}
           onApply={(offset) => {
-            updateSettings({ inputOffsetMs: offset });
+            updateSettings({ calibrations: { ...settings.calibrations, [configKey()]: offset } });
             setScreen(screen.returnTo === 'setup' ? { name: 'setup', step: 'ready' } : { name: 'home' });
           }}
           onBack={() => setScreen(screen.returnTo === 'setup' ? { name: 'setup', step: 'ready' } : { name: 'home' })}
@@ -200,6 +210,7 @@ export function App() {
       return (
         <HomeScreen
           mic={mic}
+          nativeDevices={nativeDevices}
           collections={COLLECTIONS}
           world={collectionOf(selected)}
           progress={progress}
@@ -211,6 +222,7 @@ export function App() {
           settings={settings}
           onSettingsChange={updateSettings}
           onPlay={() => startLevel(selected, mode)}
+          onPracticeSection={(section) => startLevel(selected, mode, settings.practiceSpeed, section)}
           onDiagnostics={() => setScreen({ name: 'diagnostics' })}
           onCalibrate={() => setScreen({ name: 'calibration', returnTo: 'home' })}
           onSetup={() => setScreen({ name: 'setup', step: 'welcome' })}

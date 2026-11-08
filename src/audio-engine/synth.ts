@@ -321,3 +321,56 @@ export function lead(ctx: BaseAudioContext, out: AudioNode, t: number, midi: num
   lfo.start(t);
   return voice(g, [o, lfo], t + dur + 0.25);
 }
+
+export type EffectKind = 'perfect' | 'great' | 'good' | 'miss' | 'wrong' | 'hold';
+
+/** Short, quiet game sound effects (PRD: optional game effects, own volume). */
+export function effect(ctx: BaseAudioContext, out: AudioNode, t: number, kind: EffectKind): Voice {
+  const g = envGain(ctx, out);
+  const oscs: OscillatorNode[] = [];
+  const add = (freq: number, type: OscillatorType, level: number, glideTo?: number, dur = 0.12) => {
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + dur);
+    const og = ctx.createGain();
+    og.gain.value = level;
+    o.connect(og).connect(g);
+    o.start(t);
+    oscs.push(o);
+  };
+  let dur = 0.12;
+  switch (kind) {
+    case 'perfect':
+      add(2093, 'sine', 0.5);
+      add(3136, 'sine', 0.25);
+      dur = 0.18;
+      break;
+    case 'great':
+      add(1568, 'sine', 0.45);
+      dur = 0.1;
+      break;
+    case 'good':
+      add(1175, 'triangle', 0.35);
+      dur = 0.08;
+      break;
+    case 'hold':
+      add(1319, 'sine', 0.35);
+      add(1976, 'sine', 0.2);
+      dur = 0.22;
+      break;
+    case 'miss':
+      add(140, 'sine', 0.8, 70, 0.15);
+      dur = 0.16;
+      break;
+    case 'wrong':
+      add(233, 'square', 0.18);
+      add(247, 'square', 0.18);
+      dur = 0.09;
+      break;
+  }
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.35, t + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  return voice(g, oscs, t + dur + 0.02);
+}

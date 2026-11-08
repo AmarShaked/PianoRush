@@ -1,4 +1,4 @@
-# Piano Rush — Architecture (Milestones 1–4)
+# Piano Rush — Architecture
 
 ## Goals that shaped the design
 
@@ -225,6 +225,49 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
   - **Cache versioning:** the cache name comes from the file list, and old caches are deleted on activation.
   - Registered in production only. The build uses `base: './'`, so it runs from any path.
 - **TypeScript projects:** `tsconfig.app.json` (browser code, no Node types) and `tsconfig.node.json` (build tooling), tied together by `tsc -b`.
+
+## Worlds 3–6, practice, microphone and platforms
+
+**Content generation (`song-content/parts.ts`, `levels/derived.ts`)**
+- `chordPart` makes chord parts from a progression in block, beats, pop, broken or Alberti patterns. `bassPart` makes left-hand bass in whole, half, beats, waltz or root-fifth patterns.
+- Every generated note is a chord tone by construction, and same-pitch notes never overlap.
+- Worlds 4–6 derive their levels from melodies the player already knows:
+  - `leftHandVersion`: one octave down, fingering 5-4-3-2-1;
+  - `accompanimentVersion`: the player plays the chords and the band plays the tune as `backing.lead`;
+  - `twoHandVersion`: right-hand melody plus a generated left-hand bass, with `backing.omit: ['bass']`.
+- `fiveFingerFingering` provides finger guidance.
+- `transposeChord` / `transposeSteps` reuse tunes in new keys (Ode to Joy in F for B♭).
+
+**Arranger registers**
+- `registersFor(lanes)` keeps every pitched band part outside the player's range: chords move above a left-hand part, and the bass stays below the lowest lane.
+- A test checks this for left-hand, two-hand and chord lane sets.
+- With a `lead`, pads are dropped; `omit` removes parts the player covers.
+
+**Renderer**
+- Black-key lanes and keys, flat spelling (`preferFlats`).
+- Hand divider and labels (each lane's hand comes from the majority of its notes).
+- Finger numbers, a LOW C landmark, and connecting bars for chord tiles.
+- A minimal-effects mode.
+
+**Practice (`song-content/practice.ts`)**
+- `findPhrases` labels 4-bar phrases by content (same letter = same notes and rhythm).
+- `repeatedPatterns` reports the phrases that repeat.
+- `sliceSong(from, to, repeats)` builds a looped section with matching chords and lead; it is validated and unranked (`evaluateRun(…, practice=true)`).
+
+**Microphone (`piano-input/pitch.ts`, `PitchTracker.ts`, `MicrophoneInput.ts`)**
+- YIN detection on 2048-sample windows every 20 ms. The tracker debounces onsets (timestamped at the first frame) and turns them into PianoEvents.
+- Releases are decays to 18% of the peak. A sudden level rise on the same pitch counts as a re-strike, and pitches outside the range (bass bleed) are ignored.
+- Event times are the middle of the analysis window minus the reported input latency.
+
+**Native bridge (`piano-input/NativeMidiBridge.ts`)**
+- `window.PianoRushNative` receives raw MIDI bytes plus the event's age from iOS/Android wrappers.
+- Events go through the same parser and filtering as Web MIDI. See PLATFORMS.md.
+
+**Calibration per device (`app/calibrationKeys.ts`)**
+- Offsets are stored under `"<input>|<wired|wireless>"`, where the input is a named MIDI device, the keyboard or the microphone. The wireless/wired flag comes from the reported output latency.
+- `inputOffsetMs` is the default for configurations that haven't been calibrated.
+
+**Sound effects** go through their own `effects` bus in `AudioEngine.playEffect`, triggered by engine judgment, hold and wrong-note events.
 
 ## Extension points (not implemented)
 

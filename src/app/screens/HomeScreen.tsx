@@ -1,12 +1,14 @@
 import { DEFAULT_KEY_MAP, keyLabel } from '../../piano-input/KeyboardSimulator';
 import { midiToNoteName } from '../../piano-input/noteNames';
-import { isPlayable, songFor } from '../catalog';
+import { isPlayable, songFor, type PracticeSection } from '../catalog';
+import { findPhrases, repeatedPatterns } from '../../song-content/practice';
 import { GAME_MODES, type GameMode, type LevelDefinition, type WorldDefinition } from '../../song-content/level';
 import { PRACTICE_SPEEDS, totalStars, type ProgressMap } from '../../game-engine/progression';
 import { InputPanel } from '../components/InputPanel';
 import { MiniKeyboard } from '../components/MiniKeyboard';
 import { Stars } from '../components/Stars';
-import { TIMING_PRESETS, type PianoOutput, type Settings, type TimingPreset } from '../storage';
+import { TIMING_PRESETS, type PianoOutput, type Settings, type TimingPreset, type VisualEffects } from '../storage';
+import { describeConfig } from '../calibrationKeys';
 import { audioEngine } from '../inputs';
 import { isHighLatency } from '../../audio-engine/calibration';
 import type { useMidi } from '../useMidi';
@@ -15,6 +17,8 @@ import { MODE_LABEL } from './GameScreen';
 
 interface HomeScreenProps {
   mic: MicState;
+  /** Devices connected through a native app wrapper. */
+  nativeDevices: readonly string[];
   collections: readonly WorldDefinition[];
   world: WorldDefinition;
   progress: ProgressMap;
@@ -29,6 +33,7 @@ interface HomeScreenProps {
   onDiagnostics: () => void;
   onCalibrate: () => void;
   onSetup: () => void;
+  onPracticeSection: (section: PracticeSection) => void;
 }
 
 const KEY_HINTS: Record<number, string> = Object.fromEntries(
@@ -53,7 +58,7 @@ function Slider({ label, value, onChange }: { label: string; value: number; onCh
 }
 
 export function HomeScreen(props: HomeScreenProps) {
-  const { mic, collections, world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate, onSetup } = props;
+  const { mic, nativeDevices, collections, world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate, onSetup, onPracticeSection } = props;
   const latency = audioEngine.latency;
   const outputLatencyMs = latency?.output != null ? Math.round(latency.output * 1000) : null;
   const levels = world.levels;
@@ -62,7 +67,7 @@ export function HomeScreen(props: HomeScreenProps) {
   const selectedIndex = levels.indexOf(selected);
   const song = songFor(selected);
   const unlocked = isOpen(selectedIndex);
-  const hasInput = midi.listening || settings.keyboardSimulator || mic.status === 'listening';
+  const hasInput = midi.listening || settings.keyboardSimulator || mic.status === 'listening' || nativeDevices.length > 0;
   const hasChords = song.events.some((e) => e.noteIds.length > 1);
 
   const seconds = Math.round((song.endMs + song.countInMs) / 1000);
@@ -194,6 +199,8 @@ export function HomeScreen(props: HomeScreenProps) {
               {settings.practiceSpeed < 1 && <span className="small muted">practice: no stars</span>}
             </div>
 
+            <SectionPractice level={selected} disabled={!unlocked || !hasInput} onPick={onPracticeSection} />
+
             <button className="btn btn-primary btn-play" onClick={onPlay} disabled={!unlocked || !hasInput}>
               ▶ Play {MODE_LABEL[mode]}
               {settings.practiceSpeed < 1 ? ` · ${settings.practiceSpeed * 100}%` : ''}
@@ -214,6 +221,11 @@ export function HomeScreen(props: HomeScreenProps) {
 
         <section className="card" aria-labelledby="input-heading">
           <h2 id="input-heading">Connect</h2>
+          {nativeDevices.length > 0 && (
+            <p className="msg ok small">
+              <span className="status-dot ok" aria-hidden /> Connected through the app: {nativeDevices.join(', ')}
+            </p>
+          )}
           <InputPanel
             midi={midi}
             mic={mic}
@@ -235,6 +247,7 @@ export function HomeScreen(props: HomeScreenProps) {
             <Slider label="Backing track" value={settings.backingVolume} onChange={(v) => onSettingsChange({ backingVolume: v })} />
             <Slider label="Built-in piano" value={settings.pianoVolume} onChange={(v) => onSettingsChange({ pianoVolume: v })} />
             <Slider label="Clicks" value={settings.metronomeVolume} onChange={(v) => onSettingsChange({ metronomeVolume: v })} />
+            <Slider label="Sound effects" value={settings.effectsVolume} onChange={(v) => onSettingsChange({ effectsVolume: v })} />
             <label className="toggle">
               <input type="checkbox" checked={settings.metronome} onChange={(e) => onSettingsChange({ metronome: e.target.checked })} />
               <span>Metronome click during songs</span>
@@ -267,7 +280,7 @@ export function HomeScreen(props: HomeScreenProps) {
             </label>
             <label className="field">
               <span>
-                Input offset: <b>{settings.inputOffsetMs} ms</b>
+                Default input offset: <b>{settings.inputOffsetMs} ms</b>
               </span>
               <input
                 type="range"
@@ -291,10 +304,35 @@ export function HomeScreen(props: HomeScreenProps) {
               <input type="checkbox" checked={settings.showKeyHints} onChange={(e) => onSettingsChange({ showKeyHints: e.target.checked })} />
               <span>Show keyboard-key hints in game</span>
             </label>
-            <label className="toggle">
-              <input type="checkbox" checked={settings.reducedMotion} onChange={(e) => onSettingsChange({ reducedMotion: e.target.checked })} />
-              <span>Reduced motion</span>
+            <label className="field">
+              <span>Visual effects</span>
+              <select value={settings.visualEffects} onChange={(e) => onSettingsChange({ visualEffects: e.target.value as VisualEffects })}>
+                <option value="full">Full</option>
+                <option value="reduced">Reduced (no particles or pulsing)</option>
+                <option value="minimal">Minimal (feedback only)</option>
+              </select>
             </label>
+            {Object.keys(settings.calibrations).length > 0 && (
+              <div className="field">
+                <span>Calibrated devices</span>
+                <ul className="cal-list">
+                  {Object.entries(settings.calibrations).map(([key, ms]) => (
+                    <li key={key}>
+                      {describeConfig(key)}: <b>{ms} ms</b>{' '}
+                      <button
+                        className="link-btn inline"
+                        onClick={() => {
+                          const { [key]: _removed, ...rest } = settings.calibrations;
+                          onSettingsChange({ calibrations: rest });
+                        }}
+                      >
+                        reset
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </details>
 
           <div className="home-links">
@@ -308,5 +346,35 @@ export function HomeScreen(props: HomeScreenProps) {
         </section>
       </div>
     </main>
+  );
+}
+
+/** "Practice a section": phrases with repeat labels; picking one loops it ×3 (unranked). */
+function SectionPractice({ level, disabled, onPick }: { level: LevelDefinition; disabled: boolean; onPick: (s: PracticeSection) => void }) {
+  const phrases = findPhrases(level.song).filter((p) => p.noteCount > 0);
+  const repeats = repeatedPatterns(level.song);
+  if (phrases.length < 2) return null;
+  return (
+    <details className="section-practice">
+      <summary>Practice a section</summary>
+      {repeats.length > 0 && (
+        <p className="small muted">
+          {repeats.map((r) => `Phrase ${r.label} appears ${r.occurrences.length}×`).join(' · ')} — learn it once, play it every time.
+        </p>
+      )}
+      <div className="section-list">
+        {phrases.map((p) => (
+          <button
+            key={p.index}
+            className="speed-option"
+            disabled={disabled}
+            onClick={() => onPick({ fromBeat: p.startBeat, toBeat: p.endBeat, firstBar: p.firstBar, lastBar: p.lastBar, repeats: 3 })}
+            aria-label={`Loop bars ${p.firstBar} to ${p.lastBar}, phrase ${p.label}, three times`}
+          >
+            Bars {p.firstBar}–{p.lastBar} <b>{p.label}</b>
+          </button>
+        ))}
+      </div>
+    </details>
   );
 }

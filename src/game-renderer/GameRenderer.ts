@@ -32,6 +32,8 @@ export interface GameRendererOptions {
   /** Beats of music visible above the hit line. */
   readonly lookaheadBeats?: number;
   readonly reducedMotion?: boolean;
+  /** Minimal effects: no bursts, beams or combo display — judgments and errors only. */
+  readonly minimalEffects?: boolean;
   readonly showKeyHints?: boolean;
   /** Letters on the falling tiles (the key strip is always labelled). */
   readonly showTileLabels?: boolean;
@@ -99,6 +101,7 @@ export class GameRenderer {
     this.opts = {
       lookaheadBeats: 3,
       reducedMotion: false,
+      minimalEffects: false,
       showKeyHints: true,
       showTileLabels: true,
       topInset: 0,
@@ -586,7 +589,7 @@ export class GameRenderer {
     this.effects = this.effects.filter((e) => {
       const age = now - e.start;
       if (e.kind === 'hit') {
-        if (age > HIT_FX_MS) return false;
+        if (age > HIT_FX_MS || this.opts.minimalEffects) return false;
         const t = age / HIT_FX_MS;
         const ease = 1 - (1 - t) ** 3;
         const cx = layout.left + (e.lane + 0.5) * layout.laneWidth;
@@ -697,7 +700,7 @@ export class GameRenderer {
     if (s.combo !== this.lastCombo) {
       if (s.combo > this.lastCombo) this.comboBumpAt = now;
       this.lastCombo = s.combo;
-      this.comboText.text = s.combo >= 5 ? String(s.combo) : '';
+      this.comboText.text = s.combo >= 5 && !this.opts.minimalEffects ? String(s.combo) : '';
     }
     const bump = this.opts.reducedMotion ? 0 : Math.max(0, 1 - (now - this.comboBumpAt) / 160);
     this.comboText.position.set(cx, layout.hitY * 0.42);

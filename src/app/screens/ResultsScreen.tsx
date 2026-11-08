@@ -2,12 +2,14 @@ import type { GameResults } from '../../game-engine/GameEngine';
 import type { ProgressUpdate, RunOutcome } from '../../game-engine/progression';
 import type { GameMode, LevelDefinition } from '../../song-content/level';
 import { Stars } from '../components/Stars';
+import type { PracticeSection } from '../catalog';
 import { MODE_LABEL } from './GameScreen';
 
 interface ResultsScreenProps {
   level: LevelDefinition;
   mode: GameMode;
   speed: number;
+  section?: PracticeSection | null;
   results: GameResults;
   outcome: RunOutcome;
   update: ProgressUpdate;
@@ -29,9 +31,9 @@ function offsetAdvice(mean: number | null): string | null {
 }
 
 export function ResultsScreen(props: ResultsScreenProps) {
-  const { level, mode, speed, results, outcome, update, nextLevel, onRetry, onPlayMode, onNext, onMenu } = props;
+  const { level, mode, speed, section = null, results, outcome, update, nextLevel, onRetry, onPlayMode, onNext, onMenu } = props;
   const discover = mode === 'discover';
-  const slowed = !discover && speed < 1;
+  const slowed = !discover && (speed < 1 || section !== null);
   const advice = discover ? null : offsetAdvice(results.meanOffsetMs);
   const newChallenge = mode === 'challenge' && outcome.completed && !update.previous.challengeCleared;
   const canGoNext = nextLevel !== null && update.current.completed;
@@ -50,6 +52,7 @@ export function ResultsScreen(props: ResultsScreenProps) {
         <div className="eyebrow">
           {heading} · {MODE_LABEL[mode]}
           {speed < 1 ? ` · ${Math.round(speed * 100)}% speed` : ''}
+          {section ? ` · bars ${section.firstBar}–${section.lastBar} ×${section.repeats}` : ''}
         </div>
         <h2 id="results-title">{level.world > 0 ? `${level.number}. ${level.title}` : level.title}</h2>
 
@@ -72,7 +75,12 @@ export function ResultsScreen(props: ResultsScreenProps) {
             )}
             {newChallenge && <p className="msg ok">🏆 Challenge cleared!</p>}
             {discover && <p className="msg">Nice work learning the notes. Try Flow mode to earn stars.</p>}
-            {slowed && <p className="msg">Practice at {Math.round(speed * 100)}% speed. Play at full speed to earn stars.</p>}
+            {slowed && (
+              <p className="msg">
+                {section ? 'Section practice' : `Practice at ${Math.round(speed * 100)}% speed`}. Play the whole level at full speed to earn
+                stars.
+              </p>
+            )}
             {outcome.ranked && !outcome.completed && (
               <p className="msg warn">
                 Hit at least {Math.round(level.completion.minNoteAccuracy * 100)}% of the notes to complete the level. Discover mode
@@ -134,7 +142,7 @@ export function ResultsScreen(props: ResultsScreenProps) {
           )}
           {(discover || slowed) && (
             <button className="btn btn-primary" onClick={() => onPlayMode('flow', 1)} autoFocus={!canGoNext}>
-              ▶ Play in Flow mode at full speed
+              ▶ Play the whole level (Flow, full speed)
             </button>
           )}
           <button

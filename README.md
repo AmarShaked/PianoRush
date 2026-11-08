@@ -1,30 +1,21 @@
 # Piano Rush
 
-A rhythm game you play with a **real piano**. Tiles fall toward a hit line in fixed lanes, and each lane is one physical key. You play the key when its tile reaches the line.
+A rhythm game you play with a **real piano**. Tiles fall toward a hit line, and each lane is one physical key. You play the key when its tile reaches the line, while the game plays a backing band around you. It's a piano learning game that feels like Piano Tiles.
 
-Current state: **World 2: Rhythm Road**, on top of the MVP (M1 playable prototype, M2 World 1, M3 audio, M4 setup guide and offline play).
+The full product described in the PRD is implemented:
+- **Six learning worlds, 60 levels:** from one key, through rhythm, range and black keys, then the left hand and chords, to two hands.
+- **15 famous public-domain songs** for free play.
+- **Three modes:** Discover, Flow and Challenge.
+- **Input:** MIDI, the computer keyboard, and microphone input (beta) for acoustic pianos.
+- **Audio:** synchronized, generated backing tracks and a built-in piano sound.
+- **Learning tools:** practice tools, calibration and a setup guide.
+- **Offline and installable** as an app.
 
-- **M1** added Web MIDI input, a keyboard simulator, a frame-rate-independent scoring engine and a PixiJS renderer.
-- **M2** adds:
-  - ten original World 1 levels with stars and unlocks;
-  - Discover, Flow and Challenge modes;
-  - scoring for long-note releases;
-  - chord scoring.
-- **M3** adds:
-  - a generated backing track (drums, bass and chords) in sync with the tiles;
-  - a built-in piano sound;
-  - count-in clicks and an optional metronome;
-  - volume controls;
-  - tap-along timing calibration.
-- **M4** adds:
-  - a first-launch setup guide;
-  - practice speed;
-  - offline play and installing as an app;
-  - a note-labels setting.
+See [docs/PRD_COVERAGE.md](docs/PRD_COVERAGE.md) for a section-by-section mapping, including what is intentionally left for later.
 
-![Level select with World 1 levels, stars and mode picker](docs/screenshot-home.png)
+![Level select](docs/screenshot-home.png)
 
-![Lanes C4–G4 with falling tiles, a hit line and a piano-key strip](docs/screenshot-gameplay.png)
+![Gameplay](docs/screenshot-gameplay.png)
 
 ## Quick start
 
@@ -33,202 +24,137 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Open the URL in **desktop Chrome or Edge**. Then either:
-
-- click **Connect MIDI piano** and choose your keyboard, or
-- leave **Play with keyboard simulator** on and use `A S D F G`.
-
-On first launch a short **setup guide** walks you through it:
-1. Choose how you'll play: MIDI piano or computer keyboard.
-2. Connect your piano.
-3. **Find your keys:** the game asks for middle C, then D, E, F and G. A wrong key gets a hint, e.g. "That was E4. C4 is 2 white keys to the left", or "right note, one octave too high".
-4. Pick the piano sound, with test buttons.
-5. Optionally calibrate, then start level 1.
-
-You can reopen the guide any time from **Setup guide** on the home screen.
-
-After that: pick a level (only level 1 is open at first), choose a mode and a **speed**, and press **Play**. Full speed earns stars; 75% and 50% are practice runs that slow down the tiles, the judging and the backing together.
+Open the URL in **desktop Chrome or Edge**. On first launch a short **setup guide** walks you through it:
+1. Choose how you'll play: MIDI piano, computer keyboard or microphone.
+2. Connect.
+3. **Find your keys:** the game asks for middle C, then D, E, F and G, and explains mistakes, e.g. "That was E4. C4 is 2 white keys to the left".
+4. Pick the piano sound.
+5. Optionally calibrate.
+6. Start level 1.
 
 ## Commands
 
-| Command             | What it does                                         |
-| ------------------- | ---------------------------------------------------- |
-| `npm run dev`       | Vite dev server with hot reload                      |
-| `npm test`          | Run all Vitest unit tests once (deterministic, no browser) |
-| `npm run test:watch`| Vitest in watch mode                                 |
-| `npm run typecheck` | TypeScript strict type check                         |
-| `npm run build`     | Type check + production build into `dist/`           |
-| `npm run preview`   | Serve the production build locally (with the offline service worker) |
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server with hot reload |
+| `npm test` | All Vitest tests: deterministic, no browser |
+| `npm run typecheck` | TypeScript strict check (app and build tooling) |
+| `npm run build` | Type check + production build into `dist/` (includes the offline service worker) |
+| `npm run preview` | Serve the production build |
 
-Add `?debug` to the URL (e.g. `http://localhost:5173/?debug`) to show an FPS / song-time readout during play.
+Add `?debug` to the URL for an FPS and song-time readout during play.
 
-## How to play
+## Playing
 
-| Lane | Piano key | MIDI | Simulator key |
-| ---- | --------- | ---- | ------------- |
-| 1    | C4 (middle C) | 60 | `A` |
-| 2    | D4        | 62   | `S`           |
-| 3    | E4        | 64   | `D`           |
-| 4    | F4        | 65   | `F`           |
-| 5    | G4        | 67   | `G`           |
-| (6)  | A4        | 69   | `H`, for six-key Hits songs |
+- **Hitting notes:** a tile's **bottom edge** is the moment to press. Tall tiles with a stripe are **long notes**: hold them until they drain into the line.
+- **Chords:** tiles joined by a bar are a **chord**; press those keys together.
+- **Timing:** **Perfect** ≤ 60 ms, **Great** ≤ 130 ms, **Good** ≤ 220 ms. Relaxed and Strict presets are in Settings, and Challenge mode is always Strict.
+- **Pausing:** **Esc** pauses (or use the ❚❚ button). On the pause screen, **R** restarts.
+- **Modes:**
+  - **Discover:** the song waits for the right key.
+  - **Flow:** full tempo; earns stars.
+  - **Challenge:** strict timing; earns a 🏆.
+- **Practice speed:** 50% / 75% / Full. **Practice a section** loops any 4-bar phrase three times and points out repeated phrases ("Phrase A appears 4×"). Practice runs never give stars.
+- **Stars per level:** ★ for completing (≥ 50% of notes), ★★ for ≥ 80%, ★★★ for ≥ 95%. Completing a level unlocks the next, and the unlock order continues across worlds.
 
-- Put your right thumb on **middle C**. The home screen shows where it is, and in the game it is marked on the key strip. Your five fingers rest on C D E F G.
-- A tile's **bottom edge** is the moment to press. Tall tiles are long notes, so keep holding them.
-- Judgments: **Perfect** ≤ 60 ms, **Great** ≤ 130 ms, **Good** ≤ 220 ms, otherwise **Miss**. You can switch to Relaxed or Strict in Settings.
-- **Esc** or **P** pauses the game. On the pause screen, **R** restarts. When you resume, there is a 3-beat countdown first.
+### Computer keyboard
 
-## Levels, modes and progress
+| Row | Keys | Notes |
+| --- | --- | --- |
+| Home row | `A S D F G H J K L ; '` | C4 D4 E4 F4 G4 A4 B4 C5 D5 E5 F5 |
+| Row above | `W E · T Y U · O P` | C#4 D#4 · F#4 G#4 A#4 · C#5 D#5 |
+| Bottom row (left hand) | `Z X C V B N M` | C3 D3 E3 F3 G3 A3 B3 |
 
-**World 1, First Touch.** Right hand, five-finger position from middle C. Each level adds one idea, and every level has an energetic pop, dance or groove backing. Four levels use famous public-domain songs, chosen because they fit exactly the keys taught so far (★ HIT on the tile).
+## Worlds
 
-| # | Level | New skill | Keys | Song |
-|---|-------|-----------|------|------|
-| 1 | First Note | play middle C in time | C | Knock Knock (original, dance beat) |
-| 2 | Up & Down | move between two keys | C D | Seesaw (original) |
-| 3 | Three Steps | stepwise up and down | C–E | **Au Clair de la Lune** ★ |
-| 4 | Little Melody | first tune shape | C–F | Paper Boats (original) |
-| 5 | Five Fingers | full five-finger position | C–G | **Ode to Joy** (Beethoven) ★ |
-| 6 | Hold It | long notes (release is scored) | C–G | **When the Saints Go Marching In** ★ |
-| 7 | Jump! | thirds and fifths | C–G | Frog Pond (original) |
-| 8 | Rhythm Run | eighths, dotted rhythms, rests | C–G | **Jingle Bells** (Pierpont) ★ |
-| 9 | Memory Challenge | each phrase repeats with fading tiles | C–G | Echo Valley (original) |
-| 10 | First Concert | full performance piece | C–G | Starlight Steps (original) |
+| World | Skill | Famous songs inside |
+| --- | --- | --- |
+| **1 · First Touch** | one key → five keys (C–G), long notes, jumps, rhythm, memory | Au Clair de la Lune, Ode to Joy, When the Saints, Jingle Bells |
+| **2 · Rhythm Road** | steady pulse, halves and wholes, rests, eighths, **3/4**, dotted notes, syncopation | Lightly Row, Hot Cross Buns, Go Tell Aunt Rhody |
+| **3 · Melody Mountain** | 6 keys, full octave, leaps, hand shift, **black keys** (B♭, F♯, G♯, D♯) | Twinkle, Joy to the World, Brahms' Lullaby, Amazing Grace, Greensleeves, **Für Elise** |
+| **4 · Left Hand Land** | left hand C3–G3 (fingers 5-4-3-2-1), walking bass | known melodies, now in the left hand |
+| **5 · Chord City** | thirds, open pairs, the C triad, C/F/G chords, pop rhythm, broken chords, Alberti bass; **the band plays the tune while you accompany** | Au Clair, Mary, Twinkle, Lightly Row, Ode to Joy, Hot Cross Buns, Jingle Bells |
+| **6 · Two Hands Festival** | call and response, left-hand bass under right-hand melody (whole, half, waltz, root-fifth), octave unison | Ode to Joy, Lightly Row, Saints, Jingle Bells, Mary, Hot Cross Buns |
 
-**World 2, Rhythm Road** opens when you complete World 1's finale. It keeps the same five keys (C–G), so each level adds **one new rhythm skill**.
+**🔥 Hits** has 15 famous public-domain songs, all open from the start, with full-energy arrangements. They keep their own scores and never affect unlocks.
 
-| # | Level | New skill | Song |
-|---|-------|-----------|------|
-| 1 | Steady Beat | steady quarter-note pulse | Marching Band (original) |
-| 2 | Long & Short | half and whole notes | **Lightly Row** ★ |
-| 3 | Rest Stop | rests inside phrases | Tiptoe (original) |
-| 4 | Quick Pairs | eighth notes | **Hot Cross Buns** ★ |
-| 5 | Waltz Time | **3/4 time**, with an oom-pah-pah backing | Carousel (original) |
-| 6 | Dotted Notes | dotted quarter + eighth | Gallop (original) |
-| 7 | Off the Beat | syncopation | Hopscotch (original) |
-| 8 | Tell It Again | mixed review, quicker | **Go Tell Aunt Rhody** ★ |
-| 9 | Rhythm Memory | rhythms from memory (fading repeats) | Drum Talk (original) |
-| 10 | Rhythm Road Finale | everything, in a ~53 s piece | Open Road (original) |
+**Songs and copyright.** Every melody is either original or in the public domain: transcribed from the traditional tune, with Piano Rush's own harmonies. Every backing track is generated by the game. Copyrighted songs, such as current pop hits, need publisher and label licenses before they can be added; they would use the same song format.
 
-**🔥 Hits (free play).** These famous songs are open from the start, with faster, full-energy arrangements:
-- Ode to Joy (with Beethoven's dotted rhythm)
-- Jingle Bells
-- When the Saints Go Marching In
-- Au Clair de la Lune
-- Mary Had a Little Lamb (keys C D E G)
-- Twinkle Twinkle Little Star (six keys, C–A)
-- London Bridge (six keys)
-- Lightly Row
-- Go Tell Aunt Rhody
-- Hot Cross Buns
-
-Hits keeps its own stars and best scores, and never unlocks World 1 levels.
-
-**Which songs can be included.** Every melody is either an original or in the **public domain**, and every backing track is generated by the game. Copyrighted songs, such as current pop hits, need a license from both the music publisher (for the composition) and the label (for the recording) before they can be added. That's why there's no Dance Monkey. Once you have rights, songs plug into the same `SongDefinition` format.
-
-**Modes** (all use the same song data):
-
-- **Discover**: the song stops when a note reaches the line and waits until you play it. A pill names the key, and that key is highlighted. This is practice only: no stars, no unlocks.
-- **Flow**: full tempo, and the music keeps going through mistakes. Earns stars.
-- **Challenge**: strict timing windows (±40/90/150 ms). Completing it earns the level's 🏆.
-
-**Stars and unlocks** (per level):
-
-| Result | Note accuracy |
-| ------ | ------------- |
-| Complete (★) | ≥ 50 % |
-| ★★ | ≥ 80 % |
-| ★★★ | ≥ 95 % |
-
-Completing a level unlocks the next one. Progress, best scores and the chosen mode are saved in your browser. Returning players start on their next unfinished level.
-
-**Long notes** are tall tiles with a stripe. Keep the key down until the tile has drained into the line. Releasing early loses the hold bonus, but keeps the hit and the combo.
+**Finger guidance.** Finger numbers appear on the key strip (Settings → Finger numbers on keys). The game also marks **middle C**, or **LOW C** in left-hand songs, and labels the LEFT HAND / RIGHT HAND groups in two-hand songs.
 
 ## Sound
 
-- **Backing track:** every level has a written chord progression and a style:
-  - **waltz** (3/4): kick and bass on 1, chords on 2 and 3;
-  - **dance:** four-on-the-floor kick, claps, off-beat open hats, synth bass and stabs;
-  - **pop:** a driving eighth-note bass and backbeat;
-  - **groove:** syncopated.
+- **Backing band.** Drums, bass and chords are generated from each song's chord progression and style (dance, pop, groove, waltz, gentle), with fills and crashes every 4-bar phrase.
+  - It never plays your part, and it moves out of whatever register you're playing in.
+  - In Chord City it plays the melody instead (you play the harmony); in two-hand songs it leaves the bass to you.
+- **Sync.** The music follows the same song timeline as the tiles and the scoring, and is scheduled ahead. Speaker latency is compensated by mapping the browser's audio clock to the game clock (re-measured continuously), so there is no drift. Pause, resume, restart and Discover waits all stop and resume cleanly.
+- **Piano sound.**
+  - **My piano:** your instrument makes the sound.
+  - **Built-in piano:** velocity-sensitive.
+  - **Auto:** built-in only when nothing else makes sound.
+- **Volumes.** Backing, built-in piano, clicks and **sound effects** each have a slider. There are 4 count-in clicks, plus an optional metronome.
+- **Calibration** (Settings → Timing & display):
+  - Tap along to 12 clicks; the median offset becomes the input offset, **saved per device configuration** (input device × wired/wireless audio).
+  - It also shows the latency your device reports.
+  - Bluetooth-level latency (≥ 100 ms) gets a warning.
 
-  Energetic styles add a crash at each 4-bar phrase and a snare-roll fill into the next one. The other details: The game turns them into drums, bass and chords, synthesized live with Web Audio. There are no audio files, so it works offline and everything is original.
-  - The backing **never plays your melody**, and all its pitched parts stay below middle C.
-  - Each progression is checked by a test: every melody note on a strong beat, or two beats or longer, must be a chord tone.
-- **Piano sound** (Settings → Sound):
-  - **My piano makes the sound:** your digital piano plays.
-  - **Built-in piano:** the game plays a synthesized piano for your keys.
-  - **Auto** (the default): built-in when no MIDI piano is connected, so the keyboard simulator isn't silent.
-- **Count-in:** you always hear 4 clicks. An optional **metronome** clicks every beat. There are separate volume sliders for backing, built-in piano and clicks.
-- **Discover:** while the song waits for you, the current chord keeps sounding softly. The groove resumes when you play the note.
-- **Calibration** (Settings → Timing & display → Calibrate timing): tap along to 12 clicks and the game suggests an input offset. It also shows the audio latency your device reports, which is already compensated. If that is high (≥100 ms, typical of Bluetooth), you'll see a warning recommending wired headphones or speakers.
+## Inputs
+
+| Input | Notes |
+| --- | --- |
+| **MIDI piano** (Web MIDI) | Device list, hot-plug, auto-reconnect to the last device, auto-pause when unplugged mid-song |
+| **Computer keyboard** | See the table above |
+| **Microphone (beta)** | Acoustic pianos, **one note at a time** (YIN pitch detection). Use headphones so the band doesn't leak into the mic, and calibrate once. Chord levels warn that MIDI works best |
+| **Native app bridge** | `window.PianoRushNative.midi(bytes, ageMs, deviceId, name)` lets an iOS/Android wrapper feed CoreMIDI / android.media.midi events (Safari has no Web MIDI). See [docs/PLATFORMS.md](docs/PLATFORMS.md) |
+
+**MIDI diagnostics** (home screen) shows the device, last note, pitch, velocity, event type, timestamp, held notes and a log of filtered events.
+
+### Connecting a real MIDI piano
+
+1. Connect the piano by USB ("USB to Host") or through a USB-MIDI interface, and switch it on.
+2. Use desktop **Chrome, Edge or Opera** (Firefox 108+ needs a site-permission add-on), served from `https://` or `localhost`.
+3. Click **Connect MIDI piano**, allow access, and pick your device.
+4. Check **MIDI diagnostics**, then calibrate once.
 
 ## Offline and install
 
-The production build is **offline-first**. A service worker, generated at build time with no extra dependencies, pre-caches every file on the first visit. That covers the code, the lazily loaded PixiJS chunks, the icons and all songs; the songs are bundled and the backing is synthesized. After one online visit the game runs with no network.
-
-It is also installable: it ships a web app manifest (landscape, fullscreen) and app icons, so the browser can install it as an app. Updates arrive automatically the next time you're online.
-
-## Connecting a real MIDI piano
-
-1. Connect the piano to the computer, either over USB ("USB to Host" port) or through a USB-MIDI interface. Turn the piano on.
-2. Open the game in **Chrome, Edge or Opera** on desktop. Firefox 108+ also works, but it asks you to install a site permission add-on. The page must come from `https://` or `http://localhost`.
-3. Click **Connect MIDI piano**, then allow MIDI access in the browser prompt.
-4. Pick your device from **Input device**. If only one device is connected, it is selected for you. The game remembers your choice and reconnects to it next time.
-5. Open **MIDI diagnostics** and press a few keys. You should see Note On / Note Off events with pitch, velocity and timestamps, and the held keys light up.
-6. If hits are always judged LATE even when they feel on time, raise **Settings → Input offset**. Results also show your average early/late tendency.
-
-If the piano is unplugged during a level, the game pauses and shows a notice. Plug it back in and press Resume. The device is re-attached automatically.
-
-**Bluetooth MIDI** works if the operating system exposes it as a MIDI port. Bluetooth adds latency, so you will probably need an input offset.
+The production build is **offline-first**: after one visit, the code, songs and backing (synthesized) work with no network. It is also installable (manifest, icons, fullscreen landscape). Updates arrive the next time you're online.
 
 ## Browser compatibility
 
-| Browser | Gameplay | Web MIDI |
-| ------- | -------- | -------- |
-| Chrome / Edge / Opera (desktop) | ✅ | ✅ |
-| Firefox (desktop) 108+ | ✅ | ✅ (needs site permission add-on) |
-| Safari (macOS) | ✅ | ❌ No Web MIDI. Use the keyboard simulator. |
-| Safari / any browser on iOS & iPadOS | ✅ | ❌ No Web MIDI. A native adapter is planned. |
-| Chrome on Android | ✅ | ✅ (USB OTG), not yet tested |
+| Browser | Gameplay | Web MIDI | Microphone |
+| --- | --- | --- | --- |
+| Chrome / Edge / Opera (desktop) | ✅ | ✅ | ✅ |
+| Firefox (desktop) 108+ | ✅ | ✅ (add-on prompt) | ✅ |
+| Safari (macOS) | ✅ | ❌ (keyboard, mic, or native wrapper) | ✅ |
+| iOS / iPadOS (any browser) | ✅ | ❌ (native wrapper planned, bridge ready) | ✅ |
+| Chrome on Android | ✅ | ✅ (USB OTG), not tested | ✅ |
 
-The app detects Web MIDI support at runtime. It never assumes Safari supports it, and it shows guidance when MIDI is unavailable. Rendering needs WebGL or WebGPU.
+Rendering needs WebGL or WebGPU.
 
 ## Project layout
 
 ```
 src/
-  game-engine/    Pure game logic: transport, matching, chords, holds, Discover waits, scoring, state machine, progression
-  piano-input/    PianoEvent contract, Web MIDI manager, keyboard simulator, held-note tracking
-  song-content/   Versioned beat-based song schema, validation, compilation, level definitions, World 1
-  game-renderer/  PixiJS presentation (reads engine snapshots, never drives time)
-  audio-engine/   Web Audio: clock mapping, arranger, scheduler, synths, built-in piano, calibration
-  pwa/            Build-time service-worker generator (offline-first)
-  app/            React screens, GameSession orchestration, settings persistence
-  test/           Shared test helpers and fakes
+  game-engine/    Transport (pauses, waits), matching, chords, holds, Discover, scoring, progression
+  piano-input/    PianoEvent contract · Web MIDI · keyboard · microphone (YIN + tracker) · native bridge
+  song-content/   Schema, validation, chords, part generators, practice tools, World 1–6 + Hits
+  audio-engine/   Clock sync, arranger, scheduler, synths, built-in piano, calibration analysis
+  game-renderer/  PixiJS view (lanes, black keys, hands, fingers, chord bars, effects)
+  pwa/            Build-time service-worker generator
+  app/            React screens and orchestration (setup, home, game, results, calibration, diagnostics)
 docs/
-  ARCHITECTURE.md
-  MANUAL_TEST_CHECKLIST.md
+  ARCHITECTURE.md · PRD_COVERAGE.md · PLATFORMS.md · MANUAL_TEST_CHECKLIST.md
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, and [docs/MANUAL_TEST_CHECKLIST.md](docs/MANUAL_TEST_CHECKLIST.md) for testing on real hardware.
+## Testing and known limitations
 
-## Known limitations
-
-- **The audio is synthesized, not recorded.** The built-in piano and the backing are simple synths: pleasant, but not a sampled grand piano or a real band.
-- **Calibration measures audio-to-key timing only.** It does not measure display latency separately.
-- **The backing has no hit or miss sound effects.**
-- **Chords are engine-only.** Chord scoring (one musical event, with a rule for partly played chords) is implemented and tested, but World 1 is single-note right-hand content, so no level uses chords yet (PRD: World 5).
-- **Worlds 1–2 exist.** Worlds 3–6 (larger range and black keys, left hand, chords, two hands) are not authored yet.
-- **Discover does not slow the tempo.** It stops at each note, but between notes it moves at the song tempo.
-- **No calibration flow.** There is only a manual input offset. Output latency (audio/display) is not measured.
-- **Progress is per browser.** It lives in `localStorage`, with no sync (by design for the MVP).
-- **Safari / iOS have no MIDI input.** This needs a native wrapper or adapter.
-- **Audio sync was verified in headless Chromium, not by ear on real speakers.**
-  - Offline rendering puts notes within 0.1 ms of their target sample.
-  - Live, the scheduled beats keep the exact tempo across a whole level, with under 0.1 ms jitter and no drift.
-  - The mapping between the audio and game clocks stays within 0.2 ms of the browser's timestamps (95th percentile).
-  - Perceived sync on your speakers still needs a human check (see the checklist).
-- **Not yet verified on a physical MIDI piano or a real GPU.** The MIDI path is covered by unit tests against a faked Web MIDI API and was exercised in headless Chromium with the keyboard simulator. 60 FPS has not been measured on real hardware. The headless test container has no GPU, so software rendering reached only about 13 FPS there. Scoring was identical regardless of frame rate. Use `?debug` and the manual checklist on real devices.
-- **Offline mode only works in the production build** (`npm run build && npm run preview`, or deployed). The dev server doesn't register the service worker.
-- Phones are supported in landscape at a basic level. Portrait shows a "rotate your device" prompt.
+- **Automated:** Vitest unit tests cover the engine, input layers, every song's content and harmony, the arranger, the practice tools and calibration. Headless-Chromium end-to-end checks covered:
+  - gameplay and progression, offline play, audio scheduling and sync;
+  - microphone recognition, fed a synthesized WAV as the mic;
+  - the native bridge.
+- **Not verified on real hardware.** Nobody has tested with a physical MIDI piano, a real acoustic piano through a microphone, a real GPU (60 FPS), or by ear on real speakers. Use [docs/MANUAL_TEST_CHECKLIST.md](docs/MANUAL_TEST_CHECKLIST.md).
+- **Microphone** is monophonic and beta. A loud backing on speakers can leak into the mic, so use headphones.
+- **No native iOS/Android apps are built.** The bridge and the evaluation are in place (see PLATFORMS.md).
+- **Synthesized audio:** pleasant, but not a sampled grand piano or a recorded band.
+- **Progress lives in the browser:** no accounts or sync, by design (PRD §16).
