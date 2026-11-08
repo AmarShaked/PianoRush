@@ -13,6 +13,13 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] **Sound step:** "Built-in piano" and "Hear the band" both make sound, and the chosen option is saved
 - [ ] "Calibrate timing first" returns to the guide's last step. "Start Level 1" starts the level
 
+## World 2 — Rhythm Road
+- [ ] The World 2 tab is locked until World 1 level 10 is completed, then level 1 opens. "Next" from World 1's finale goes to World 2 level 1
+- [ ] Waltz Time: the count-in has 6 clicks (two bars of 3), the bar lines on screen fall every 3 beats, and the backing goes oom-pah-pah
+- [ ] Off the Beat: the syncopated notes (starting between beats) feel natural with the beat
+- [ ] Rhythm Memory: the repeated phrases fade before the line
+- [ ] The harmonies under Lightly Row, Hot Cross Buns and Go Tell Aunt Rhody sound right
+
 ## Practice speed, labels, offline (M4)
 - [ ] The 50% and 75% speeds slow the tiles, judging and backing together. The results say "Practice", with no stars and no unlocks
 - [ ] "Note letters on tiles" hides the tile letters, while the key strip keeps its labels

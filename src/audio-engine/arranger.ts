@@ -71,11 +71,11 @@ export function arrange(song: CompiledSong, options: ArrangeOptions = {}): Backi
     });
   }
 
-  const energetic = spec.style === 'pop' || spec.style === 'dance';
+  const energetic = spec.style === 'pop' || spec.style === 'dance' || spec.style === 'waltz';
   for (let bar = 0; bar * bpb < endingStart; bar++) {
     if (energetic && bar % 4 === 0) out.push({ part: 'crash', beat: bar * bpb, durationBeats: 2, velocity: bar === 0 ? 0.7 : 0.5 });
     // Fill on the last beat of every 4-bar phrase (and before the ending): a rising snare roll.
-    const fillBar = (bar % 4 === 3 || (bar + 1) * bpb >= endingStart) && energetic;
+    const fillBar = (bar % 4 === 3 || (bar + 1) * bpb >= endingStart) && energetic && spec.style !== 'waltz';
     if (fillBar) {
       for (let k = 0; k < 4; k++) out.push({ part: 'snare', beat: bar * bpb + bpb - 1 + k * 0.25, durationBeats: 0.25, velocity: 0.35 + k * 0.12 });
     }
@@ -133,6 +133,19 @@ function pattern(
     push({ part: 'hat', beat: beat + 0.5, durationBeats: 0.25, velocity: 0.14 });
     const note = pos === mid && !chordChangedAt(chordOf, beat) ? fifth : root;
     push({ part: 'bass', beat, durationBeats: 0.9, velocity: 0.65, midi: note });
+    return;
+  }
+
+  if (style === 'waltz') {
+    // Oom-pah-pah: bass + kick on the downbeat, chord on the other beats, light crash per phrase.
+    if (pos === 0) {
+      push({ part: 'kick', beat, durationBeats: 0.5, velocity: 0.7 });
+      const barIndex = Math.floor(beat / bpb);
+      push({ part: 'bass', beat, durationBeats: 0.95, velocity: 0.7, midi: barIndex % 2 && !chordChangedAt(chordOf, beat) ? fifth : root });
+    } else {
+      for (const midi of padVoicing(chord)) push({ part: 'keys', beat, durationBeats: 0.6, velocity: 0.26, midi });
+    }
+    push({ part: 'hat', beat, durationBeats: 0.25, velocity: pos === 0 ? 0.2 : 0.12 });
     return;
   }
 

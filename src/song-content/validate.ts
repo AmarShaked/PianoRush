@@ -39,7 +39,7 @@ export function validateSong(song: SongDefinition): ValidationResult {
 
   if (song.backing) {
     const { chords, style } = song.backing;
-    if (!['gentle', 'straight', 'groove', 'pop', 'dance'].includes(style)) err(`Unknown backing style ${String(style)}`);
+    if (!['gentle', 'straight', 'groove', 'pop', 'dance', 'waltz'].includes(style)) err(`Unknown backing style ${String(style)}`);
     if (chords.length === 0 || chords[0]![0] !== 0) err('Backing chords must start at beat 0');
     chords.forEach(([beat, symbol], i) => {
       if (!parseChord(symbol)) err(`Backing chord ${i}: unknown symbol "${symbol}"`);

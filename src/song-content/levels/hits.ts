@@ -3,6 +3,10 @@ import { SONG_SCHEMA_VERSION, type BackingStyle, type SongDefinition } from '../
 import { sequence } from '../notation';
 import {
   AU_CLAIR,
+  AUNT_RHODY,
+  HOT_CROSS_BUNS,
+  LIGHTLY_ROW,
+  LONDON_BRIDGE,
   JINGLE_BELLS,
   MARY,
   ODE_TO_JOY_ORIGINAL_RHYTHM,
@@ -56,5 +60,9 @@ export const HITS: WorldDefinition = {
     hit('hits-au-clair', AU_CLAIR, 112, 'dance', 'Three keys, full club mix.', 4),
     hit('hits-mary', MARY, 116, 'pop', 'Four keys: C D E and a jump to G.', 5),
     hit('hits-twinkle', TWINKLE, 96, 'pop', 'Six keys — reach up to A with your pinky (H key).', 6),
+    hit('hits-london-bridge', LONDON_BRIDGE, 116, 'dance', 'Six keys with a dotted bounce.', 7),
+    hit('hits-lightly-row', LIGHTLY_ROW, 112, 'dance', 'Glide through the long notes.', 8),
+    hit('hits-aunt-rhody', AUNT_RHODY, 120, 'groove', 'An old folk tune with a new groove.', 9),
+    hit('hits-hot-cross-buns', HOT_CROSS_BUNS, 120, 'pop', 'Three keys, quick eighth notes.', 10),
   ],
 };

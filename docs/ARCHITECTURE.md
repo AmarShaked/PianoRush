@@ -152,7 +152,12 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
   - holds and eighths appear only where planned;
   - the faded repeat matches the shown phrase.
 - **Starlight Steps** (the M1 song) is level 10, "First Concert".
-- **Public-domain tunes** (`songs/publicDomain.ts`): Au Clair de la Lune, Ode to Joy, When the Saints, Jingle Bells, Mary Had a Little Lamb and Twinkle Twinkle.
+- **World 2** (`levels/world2.ts`) teaches rhythm in the same C–G position.
+  - Level 5 is in 3/4: `timeSignature [3, 4]`, a 6-beat count-in, and the arranger's `waltz` style.
+  - The consonance test is meter-aware: in 3/4 only the downbeat is strong.
+  - Content tests check that each level really contains its skill (halves and wholes, inner rests, eighths, 3/4, dotted, syncopation, memory fades).
+- **Path unlocking crosses worlds.** `LEVELS` is the concatenation of all path worlds, and `isPlayable`/`nextInOrder` in `app/catalog.ts` use that single order. World 2 level 1 opens when World 1 level 10 is completed, and "Next" on the results screen continues into the next world.
+- **Public-domain tunes** (`songs/publicDomain.ts`): Au Clair de la Lune, Ode to Joy, When the Saints, Jingle Bells, Mary Had a Little Lamb, Twinkle Twinkle, Lightly Row, Hot Cross Buns, Go Tell Aunt Rhody and London Bridge.
   - Each has its melody, lanes, a credit, and a chord progression written for Piano Rush.
   - World 1 uses four of them where the keys fit the skill ladder.
   - `levels/hits.ts` builds the **Hits** free-play collection from them (`WorldDefinition.kind = 'freeplay'`: all open, separate ids so progress never unlocks World 1).
@@ -229,6 +234,6 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
 | Sound effects | Engine `note`/`judgment`/`hold` events; add an `effects` bus to `AudioEngine` |
 | Microphone recognition | A `PianoInputSource` with `kind: 'microphone'` that emits `PianoEvent`s |
 | Native MIDI (iOS, desktop wrappers) | A `PianoInputSource` with `kind: 'native-midi'`, or a `MidiAccessLike` bridge |
-| More worlds | Append a `WorldDefinition` to `app/catalog.ts`; lanes, holds and assists come from data |
+| More worlds (3–6) | Append a `WorldDefinition` to `WORLDS` in `app/catalog.ts`; unlocking continues automatically. Lanes, meter, holds and assists come from data. Left-hand and two-hand worlds need the song's `hand` and lanes below middle C (the arranger's bass register will need moving down) |
 | Practice tools (slow playback, section loop) | `Transport` (a rate factor fits next to the pause history) |
 | Calibration | `EngineConfig.inputOffsetMs`; results report the mean signed offset |

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chordAt, compileSong, HITS, isChordTone, parseChord, validateSong, WORLD_1 } from './index';
+import { chordAt, compileSong, HITS, isChordTone, parseChord, validateSong, WORLD_1, WORLD_2 } from './index';
 
 const levels = WORLD_1.levels;
 
@@ -100,7 +100,7 @@ describe('song compilation: events and holds', () => {
   });
 });
 
-const allSongs = [...levels, ...HITS.levels];
+const allSongs = [...levels, ...WORLD_2.levels, ...HITS.levels];
 
 describe('World 1 and Hits accompaniment', () => {
   it.each(allSongs.map((l) => [l.id, l] as const))('%s has a valid backing that covers the whole song', (_, level) => {
@@ -112,15 +112,18 @@ describe('World 1 and Hits accompaniment', () => {
   });
 
   /*
-   * Consonance rule: every melody note that starts on a strong beat (beat 1 or 3
-   * of the bar) or lasts two beats or more must be a tone of the chord that is
-   * sounding, for its whole length. Passing notes on weak beats are free.
+   * Consonance rule: every melody note that starts on a strong beat (the
+   * downbeat, plus the middle of the bar in even meters — beats 1 and 3 in 4/4)
+   * or lasts two beats or more must be a tone of the chord that is sounding,
+   * for its whole length. Passing notes on weak beats are free.
    */
   it.each(allSongs.map((l) => [l.id, l] as const))('%s: strong-beat and long melody notes are chord tones', (_, level) => {
     const chords = level.song.backing!.chords;
     const clashes: string[] = [];
+    const bpb = level.song.timeSignature[0];
     for (const n of level.song.notes) {
-      const strong = Math.abs(n.startBeat % 2) < 1e-9;
+      const pos = n.startBeat % bpb;
+      const strong = Math.abs(pos) < 1e-9 || (bpb % 2 === 0 && Math.abs(pos - bpb / 2) < 1e-9);
       if (!strong && n.durationBeats < 2) continue;
       // Check at the start and at every chord change while the note sounds.
       const checkpoints = [n.startBeat, ...chords.map(([b]) => b).filter((b) => b > n.startBeat && b < n.startBeat + n.durationBeats)];
@@ -160,6 +163,7 @@ describe('Hits (free play)', () => {
     expect(HITS.kind).toBe('freeplay');
     expect(HITS.levels.map((l) => l.title)).toEqual([
       'Ode to Joy', 'Jingle Bells', 'When the Saints Go Marching In', 'Au Clair de la Lune', 'Mary Had a Little Lamb', 'Twinkle Twinkle Little Star',
+      'London Bridge', 'Lightly Row', 'Go Tell Aunt Rhody', 'Hot Cross Buns',
     ]);
     for (const l of HITS.levels) expect(l.song.composer).toMatch(/public domain/);
   });
@@ -180,5 +184,57 @@ describe('Hits (free play)', () => {
 
   it('every song fits the keyboard simulator (C4–A4: A S D F G H)', () => {
     for (const l of HITS.levels) for (const m of l.song.lanes) expect([60, 62, 64, 65, 67, 69]).toContain(m);
+  });
+});
+
+describe('World 2 — Rhythm Road', () => {
+  const w2 = WORLD_2.levels;
+  const notesOf = (i: number) => compileSong(w2[i]!.song).notes;
+
+  it('is a path world of ten levels with ids distinct from World 1 and Hits', () => {
+    expect(WORLD_2.kind).toBe('path');
+    expect(w2.map((l) => l.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    const others = new Set([...WORLD_1.levels, ...HITS.levels].map((l) => l.id));
+    for (const l of w2) expect(others.has(l.id)).toBe(false);
+  });
+
+  it.each(w2.map((l) => [l.title, l] as const))('%s is valid, 30–60 s, ends on C, within C–G', (_, level) => {
+    expect(validateSong(level.song)).toEqual({ valid: true, errors: [] });
+    const song = compileSong(level.song);
+    expect(song.endMs / 1000).toBeGreaterThanOrEqual(30);
+    expect(song.endMs / 1000).toBeLessThanOrEqual(60);
+    expect(song.notes.at(-1)?.midi).toBe(60);
+    expect(new Set(song.notes.map((n) => n.midi))).toEqual(new Set(level.song.lanes));
+    for (const m of level.song.lanes) expect([60, 62, 64, 65, 67]).toContain(m);
+  });
+
+  it('each level contains the rhythm it teaches', () => {
+    const durations = (i: number) => new Set(notesOf(i).map((n) => n.durationBeats));
+    const restsInside = (i: number) => {
+      const ns = notesOf(i);
+      return ns.slice(1).filter((n, k) => n.startBeat - (ns[k]!.startBeat + ns[k]!.durationBeats) > 0.4).length;
+    };
+    expect(notesOf(0).every((n) => n.durationBeats >= 1)).toBe(true); // 1: quarters, no eighths
+    expect(durations(1).has(2) && durations(1).has(4)).toBe(true); // 2: halves & wholes
+    expect(restsInside(2)).toBeGreaterThan(15); // 3: many rests inside phrases
+    expect(durations(3).has(0.5)).toBe(true); // 4: eighths
+    expect(w2[4]!.song.timeSignature).toEqual([3, 4]); // 5: waltz
+    expect(w2[4]!.song.backing!.style).toBe('waltz');
+    expect(durations(5).has(1.5) && durations(5).has(0.5)).toBe(true); // 6: dotted quarter + eighth
+    expect(notesOf(6).filter((n) => n.startBeat % 1 === 0.5 && n.durationBeats >= 1.5).length).toBeGreaterThan(5); // 7: syncopation
+    expect(compileSong(w2[8]!.song).notes.some((n) => n.assistFade)).toBe(true); // 9: memory fades
+  });
+
+  it('the rhythm-memory level fades exact repeats of what was shown', () => {
+    const notes = notesOf(8);
+    const slice = (from: number, to: number) => notes.filter((n) => n.startBeat >= from && n.startBeat < to).map((n) => [n.midi, n.durationBeats, n.startBeat - from]);
+    expect(slice(16, 32)).toEqual(slice(0, 16));
+    expect(slice(48, 64)).toEqual(slice(32, 48));
+    expect(notes.filter((n) => n.assistFade).every((n) => (n.startBeat >= 16 && n.startBeat < 32) || n.startBeat >= 48)).toBe(true);
+  });
+
+  it('uses public-domain tunes for levels 2, 4 and 8', () => {
+    expect([1, 3, 7].map((i) => w2[i]!.song.title)).toEqual(['Lightly Row', 'Hot Cross Buns', 'Go Tell Aunt Rhody']);
+    for (const i of [1, 3, 7]) expect(w2[i]!.song.composer).toMatch(/public domain/);
   });
 });

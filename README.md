@@ -2,7 +2,7 @@
 
 A rhythm game you play with a **real piano**. Tiles fall toward a hit line in fixed lanes, and each lane is one physical key. You play the key when its tile reaches the line.
 
-Current state: **Milestone 4: MVP completion**, built on M1 (playable prototype), M2 (World 1 learning path) and M3 (audio).
+Current state: **World 2: Rhythm Road**, on top of the MVP (M1 playable prototype, M2 World 1, M3 audio, M4 setup guide and offline play).
 
 - **M1** added Web MIDI input, a keyboard simulator, a frame-rate-independent scoring engine and a PixiJS renderer.
 - **M2** adds:
@@ -95,6 +95,21 @@ Add `?debug` to the URL (e.g. `http://localhost:5173/?debug`) to show an FPS / s
 | 9 | Memory Challenge | each phrase repeats with fading tiles | C–G | Echo Valley (original) |
 | 10 | First Concert | full performance piece | C–G | Starlight Steps (original) |
 
+**World 2, Rhythm Road** opens when you complete World 1's finale. It keeps the same five keys (C–G), so each level adds **one new rhythm skill**.
+
+| # | Level | New skill | Song |
+|---|-------|-----------|------|
+| 1 | Steady Beat | steady quarter-note pulse | Marching Band (original) |
+| 2 | Long & Short | half and whole notes | **Lightly Row** ★ |
+| 3 | Rest Stop | rests inside phrases | Tiptoe (original) |
+| 4 | Quick Pairs | eighth notes | **Hot Cross Buns** ★ |
+| 5 | Waltz Time | **3/4 time**, with an oom-pah-pah backing | Carousel (original) |
+| 6 | Dotted Notes | dotted quarter + eighth | Gallop (original) |
+| 7 | Off the Beat | syncopation | Hopscotch (original) |
+| 8 | Tell It Again | mixed review, quicker | **Go Tell Aunt Rhody** ★ |
+| 9 | Rhythm Memory | rhythms from memory (fading repeats) | Drum Talk (original) |
+| 10 | Rhythm Road Finale | everything, in a ~53 s piece | Open Road (original) |
+
 **🔥 Hits (free play).** These famous songs are open from the start, with faster, full-energy arrangements:
 - Ode to Joy (with Beethoven's dotted rhythm)
 - Jingle Bells
@@ -102,6 +117,10 @@ Add `?debug` to the URL (e.g. `http://localhost:5173/?debug`) to show an FPS / s
 - Au Clair de la Lune
 - Mary Had a Little Lamb (keys C D E G)
 - Twinkle Twinkle Little Star (six keys, C–A)
+- London Bridge (six keys)
+- Lightly Row
+- Go Tell Aunt Rhody
+- Hot Cross Buns
 
 Hits keeps its own stars and best scores, and never unlocks World 1 levels.
 
@@ -128,6 +147,7 @@ Completing a level unlocks the next one. Progress, best scores and the chosen mo
 ## Sound
 
 - **Backing track:** every level has a written chord progression and a style:
+  - **waltz** (3/4): kick and bass on 1, chords on 2 and 3;
   - **dance:** four-on-the-floor kick, claps, off-beat open hats, synth bass and stabs;
   - **pop:** a driving eighth-note bass and backbeat;
   - **groove:** syncopated.
@@ -199,7 +219,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, and [docs/MANUA
 - **Calibration measures audio-to-key timing only.** It does not measure display latency separately.
 - **The backing has no hit or miss sound effects.**
 - **Chords are engine-only.** Chord scoring (one musical event, with a rule for partly played chords) is implemented and tested, but World 1 is single-note right-hand content, so no level uses chords yet (PRD: World 5).
-- **Only World 1 exists.** Worlds 2–6 are not authored.
+- **Worlds 1–2 exist.** Worlds 3–6 (larger range and black keys, left hand, chords, two hands) are not authored yet.
 - **Discover does not slow the tempo.** It stops at each note, but between notes it moves at the song tempo.
 - **No calibration flow.** There is only a manual input offset. Output latency (audio/display) is not measured.
 - **Progress is per browser.** It lives in `localStorage`, with no sync (by design for the MVP).

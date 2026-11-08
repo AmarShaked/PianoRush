@@ -36,7 +36,7 @@ describe('arrange', () => {
   });
 
   it('never plays in the melody register (no pitched part reaches middle C)', () => {
-    for (const style of ['gentle', 'straight', 'groove', 'pop', 'dance'] as const) {
+    for (const style of ['gentle', 'straight', 'groove', 'pop', 'dance', 'waltz'] as const) {
       const pitched = arrange(song(style)).filter((n) => n.midi !== undefined);
       expect(pitched.length).toBeGreaterThan(0);
       expect(Math.max(...pitched.map((n) => n.midi!))).toBeLessThanOrEqual(ACCOMPANIMENT_CEILING);
@@ -95,6 +95,24 @@ describe('arrange', () => {
     const roll = notes.filter((n) => n.part === 'snare' && n.beat >= 15 && n.beat < 16);
     expect(roll.map((n) => n.beat)).toEqual([15, 15.25, 15.5, 15.75]);
     expect(roll.map((n) => n.velocity)).toEqual([...roll.map((n) => n.velocity)].sort((a, b) => a - b));
+  });
+
+  it('waltz (3/4): bass + kick on 1, chords on 2 and 3, a 3-beat bar', () => {
+    const waltz = compileSong({
+      ...song('waltz').definition,
+      timeSignature: [3, 4],
+      countInBeats: 6,
+      notes: [0, 3, 6, 9, 12].map((b) => ({ midi: 60, startBeat: b, durationBeats: 1 })),
+      backing: { style: 'waltz', chords: [[0, 'C'], [3, 'F'], [6, 'G7'], [9, 'C']] },
+    });
+    const notes = arrange(waltz);
+    const bar = notes.filter((n) => n.beat >= 3 && n.beat < 6);
+    expect(bar.filter((n) => n.part === 'kick').map((n) => n.beat)).toEqual([3]);
+    expect(bar.filter((n) => n.part === 'bass').map((n) => [n.beat, n.midi])).toEqual([[3, bassRoot(parseChord('F')!)]]);
+    expect([...new Set(bar.filter((n) => n.part === 'keys').map((n) => n.beat))]).toEqual([4, 5]);
+    // Count-in of two 3/4 bars, accented on each bar start.
+    expect(notes.filter((n) => n.part === 'click').map((n) => n.accent)).toEqual([true, false, false, true, false, false]);
+    expect(count(notes, 'snare')).toBe(0);
   });
 
   it('ends with one hit and the final chord held to the end of the last bar', () => {

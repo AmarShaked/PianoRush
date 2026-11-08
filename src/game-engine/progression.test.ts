@@ -83,3 +83,15 @@ describe('progress and unlocks', () => {
     expect(nextLevelToPlay(levels, all)?.id).toBe(levels[9]!.id);
   });
 });
+
+describe('cross-world unlocking', () => {
+  it('World 2 level 1 opens only when World 1 level 10 is completed', async () => {
+    const { WORLD_2 } = await import('../song-content');
+    const path = [...WORLD_1.levels, ...WORLD_2.levels];
+    const done = (n: number): ProgressMap =>
+      Object.fromEntries(path.slice(0, n).map((l) => [l.id, { completed: true, bestStars: 1, bestScore: 1, challengeCleared: false, discoverPlayed: false }]));
+    expect(isLevelUnlocked(path, 10, done(9))).toBe(false);
+    expect(isLevelUnlocked(path, 10, done(10))).toBe(true);
+    expect(nextLevelToPlay(path, done(10))?.id).toBe(WORLD_2.levels[0]!.id);
+  });
+});

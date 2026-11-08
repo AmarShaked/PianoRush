@@ -141,3 +141,70 @@ export const TWINKLE: PublicDomainTune = {
     [32, 'C'], [36, 'F'], [38, 'C'], [40, 'F'], [42, 'C'], [44, 'G'], [46, 'C'],
   ],
 };
+
+/** Lightly Row ("Hänschen klein") — German folk song (19th c.). Half and whole notes. */
+const lightlyA: Step[] = [[G, 1], [E, 1], [E, 2], [F, 1], [D, 1], [D, 2], [C, 1], [D, 1], [E, 1], [F, 1], [G, 1], [G, 1], [G, 2]];
+const lightlyEnd: Step[] = [[G, 1], [E, 1], [E, 2], [F, 1], [D, 1], [D, 2], [C, 1], [E, 1], [G, 1], [G, 1], [C, 4]];
+export const LIGHTLY_ROW: PublicDomainTune = {
+  title: 'Lightly Row',
+  credit: 'German folk song (19th c.) · public domain',
+  lanes: [C, D, E, F, G],
+  steps: [
+    ...lightlyA, ...lightlyEnd,
+    [D, 1], [D, 1], [D, 1], [D, 1], [D, 1], [E, 1], [F, 2],
+    [E, 1], [E, 1], [E, 1], [E, 1], [E, 1], [F, 1], [G, 2],
+    ...lightlyEnd,
+  ],
+  chords: [[0, 'C'], [4, 'G7'], [8, 'C'], [12, 'G'], [16, 'C'], [20, 'G7'], [24, 'C'], [32, 'G7'], [40, 'C'], [48, 'C'], [52, 'G7'], [56, 'C']],
+};
+
+/** Hot Cross Buns — English street cry (18th c.). Three keys, eighth notes. */
+const bunsA: Step[] = [
+  [E, 1], [D, 1], [C, 2],   [E, 1], [D, 1], [C, 2],
+  [C, 0.5], [C, 0.5], [C, 0.5], [C, 0.5], [D, 0.5], [D, 0.5], [D, 0.5], [D, 0.5],   [E, 1], [D, 1], [C, 2],
+];
+const bunsB: Step[] = [
+  [E, 1], [D, 1], [C, 2],   [E, 1], [D, 1], [C, 2],
+  [E, 0.5], [E, 0.5], [E, 0.5], [E, 0.5], [D, 0.5], [D, 0.5], [D, 0.5], [D, 0.5],   [E, 1], [D, 1], [C, 2],
+];
+export const HOT_CROSS_BUNS: PublicDomainTune = {
+  title: 'Hot Cross Buns',
+  credit: 'English street cry (18th c.) · public domain',
+  lanes: [C, D, E],
+  steps: [...bunsA, ...bunsB, ...bunsA, ...bunsB],
+  chords: [
+    [0, 'C'], [4, 'Am'], [8, 'F'], [10, 'G'], [12, 'C'],
+    [16, 'C'], [20, 'Am'], [24, 'C'], [26, 'G'], [28, 'C'],
+    [32, 'C'], [36, 'Am'], [40, 'F'], [42, 'G'], [44, 'C'],
+    [48, 'C'], [52, 'Am'], [56, 'C'], [58, 'G'], [60, 'C'],
+  ],
+};
+
+/** Go Tell Aunt Rhody — American folk song (melody 18th c.). */
+const rhody: Step[] = [
+  [E, 2], [E, 1], [D, 1],   [C, 2], [C, 2],   [D, 2], [D, 1], [F, 1],   [E, 2], [D, 2],
+  [G, 2], [G, 1], [F, 1],   [E, 2], [E, 2],   [D, 1], [C, 1], [D, 1], [E, 1],   [C, 4],
+];
+export const AUNT_RHODY: PublicDomainTune = {
+  title: 'Go Tell Aunt Rhody',
+  credit: 'American folk song (18th c. melody) · public domain',
+  lanes: [C, D, E, F, G],
+  steps: [...rhody, ...rhody],
+  chords: [
+    [0, 'C'], [4, 'Am'], [8, 'G7'], [12, 'C'], [14, 'G'], [16, 'C'], [20, 'Am'], [24, 'G7'], [28, 'C'],
+    [32, 'C'], [36, 'F'], [40, 'G7'], [44, 'C'], [46, 'G'], [48, 'C'], [52, 'Am'], [56, 'G7'], [60, 'C'],
+  ],
+};
+
+/** London Bridge Is Falling Down — English nursery rhyme (17th c.). Six keys C–A. */
+const london: Step[] = [
+  [G, 1.5], [A, 0.5], [G, 1], [F, 1],   [E, 1], [F, 1], [G, 2],   [D, 1], [E, 1], [F, 2],   [E, 1], [F, 1], [G, 2],
+  [G, 1.5], [A, 0.5], [G, 1], [F, 1],   [E, 1], [F, 1], [G, 2],   [D, 2], [G, 2],           [E, 1], [C, 3],
+];
+export const LONDON_BRIDGE: PublicDomainTune = {
+  title: 'London Bridge',
+  credit: 'English nursery rhyme (17th c.) · public domain',
+  lanes: [C, D, E, F, G, A],
+  steps: [...london, ...london],
+  chords: [[0, 'C'], [8, 'G7'], [12, 'C'], [24, 'G'], [28, 'C'], [32, 'C'], [40, 'G7'], [44, 'C'], [56, 'G'], [60, 'C']],
+};

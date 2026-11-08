@@ -1,8 +1,8 @@
 import { DEFAULT_KEY_MAP } from '../../piano-input/KeyboardSimulator';
 import { midiToNoteName } from '../../piano-input/noteNames';
-import { songFor } from '../catalog';
+import { isPlayable, songFor } from '../catalog';
 import { GAME_MODES, type GameMode, type LevelDefinition, type WorldDefinition } from '../../song-content/level';
-import { isLevelUnlocked, PRACTICE_SPEEDS, totalStars, type ProgressMap } from '../../game-engine/progression';
+import { PRACTICE_SPEEDS, totalStars, type ProgressMap } from '../../game-engine/progression';
 import { InputPanel } from '../components/InputPanel';
 import { MiniKeyboard } from '../components/MiniKeyboard';
 import { Stars } from '../components/Stars';
@@ -56,7 +56,7 @@ export function HomeScreen(props: HomeScreenProps) {
   const outputLatencyMs = latency?.output != null ? Math.round(latency.output * 1000) : null;
   const levels = world.levels;
   const freePlay = world.kind === 'freeplay';
-  const isOpen = (i: number) => freePlay || isLevelUnlocked(levels, i, progress);
+  const isOpen = (i: number) => isPlayable(levels[i]!, progress);
   const selectedIndex = levels.indexOf(selected);
   const unlocked = isOpen(selectedIndex);
   const hasInput = midi.listening || settings.keyboardSimulator;
@@ -89,7 +89,7 @@ export function HomeScreen(props: HomeScreenProps) {
                 onClick={() => {
                   if (c === world) return;
                   // Jump to the first open, unfinished entry of that collection.
-                  const first = c.levels.find((l, i) => (c.kind === 'freeplay' || isLevelUnlocked(c.levels, i, progress)) && !progress[l.id]?.completed);
+                  const first = c.levels.find((l) => isPlayable(l, progress) && !progress[l.id]?.completed);
                   onSelect(first ?? c.levels[0]!);
                 }}
               >
@@ -189,7 +189,11 @@ export function HomeScreen(props: HomeScreenProps) {
               {settings.practiceSpeed < 1 ? ` · ${settings.practiceSpeed * 100}%` : ''}
             </button>
             {!unlocked && (
-              <p className="small warn-text center">Complete level {selected.number - 1} to unlock this level.</p>
+              <p className="small warn-text center">
+                {selected.number === 1
+                  ? `Complete World ${selected.world - 1}'s final level to open World ${selected.world}.`
+                  : `Complete level ${selected.number - 1} to unlock this level.`}
+              </p>
             )}
             {unlocked && !hasInput && <p className="small warn-text center">Connect a MIDI piano or enable the keyboard simulator.</p>}
           </div>

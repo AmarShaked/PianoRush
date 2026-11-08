@@ -57,7 +57,7 @@ export interface SongDefinition {
 }
 
 /** Arrangement style for the generated backing track. */
-export type BackingStyle = 'gentle' | 'straight' | 'groove' | 'pop' | 'dance';
+export type BackingStyle = 'gentle' | 'straight' | 'groove' | 'pop' | 'dance' | 'waltz';
 
 /**
  * Harmony and feel for the accompaniment. `chords` are [startBeat, symbol]

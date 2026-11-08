@@ -3,7 +3,6 @@ import type { GameResults } from '../game-engine/GameEngine';
 import {
   applyRun,
   evaluateRun,
-  isLevelUnlocked,
   nextLevelToPlay,
   type ProgressMap,
   type ProgressUpdate,
@@ -11,7 +10,7 @@ import {
 } from '../game-engine/progression';
 import type { GameMode, LevelDefinition } from '../song-content/level';
 import type { PianoInputSource } from '../piano-input/types';
-import { COLLECTIONS, collectionOf, LEVELS, songFor } from './catalog';
+import { COLLECTIONS, collectionOf, isPlayable, LEVELS, nextInOrder, songFor } from './catalog';
 import { audioEngine, keyboardSimulator, midiManager } from './inputs';
 import { loadProgress, loadSettings, saveProgress, saveSettings, type Settings } from './storage';
 import { useMidi } from './useMidi';
@@ -98,7 +97,7 @@ export function App() {
     (level: LevelDefinition, mode: GameMode, speed: number, results: GameResults) => {
       const outcome = evaluateRun(level, results, mode, speed);
       // Free-play songs never unlock anything: merge them as a list of one.
-      const list = collectionOf(level).kind === 'path' ? collectionOf(level).levels : [level];
+      const list = collectionOf(level).kind === 'path' ? LEVELS : [level];
       const update = applyRun(list, progress, level.id, outcome, results.score);
       setProgress(update.progress);
       saveProgress(update.progress);
@@ -127,11 +126,8 @@ export function App() {
         />
       );
     case 'results': {
-      const collection = collectionOf(screen.level);
-      const index = collection.levels.indexOf(screen.level);
-      const next = collection.levels[index + 1];
-      const nextLevel =
-        next && (collection.kind === 'freeplay' || isLevelUnlocked(collection.levels, index + 1, progress)) ? next : null;
+      const next = nextInOrder(screen.level);
+      const nextLevel = next && isPlayable(next, progress) ? next : null;
       return (
         <ResultsScreen
           level={screen.level}

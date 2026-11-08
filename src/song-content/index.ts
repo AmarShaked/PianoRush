@@ -8,3 +8,4 @@ export * from './level';
 export { WORLD_1 } from './levels/world1';
 export { HITS } from './levels/hits';
 export * from './songs/publicDomain';
+export { WORLD_2 } from './levels/world2';
