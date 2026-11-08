@@ -11,7 +11,7 @@ import {
 } from '../game-engine/progression';
 import type { GameMode, LevelDefinition } from '../song-content/level';
 import type { PianoInputSource } from '../piano-input/types';
-import { LEVELS, songFor, WORLDS } from './catalog';
+import { COLLECTIONS, collectionOf, LEVELS, songFor } from './catalog';
 import { audioEngine, keyboardSimulator, midiManager } from './inputs';
 import { loadProgress, loadSettings, saveProgress, saveSettings, type Settings } from './storage';
 import { useMidi } from './useMidi';
@@ -92,7 +92,9 @@ export function App() {
   const finish = useCallback(
     (level: LevelDefinition, mode: GameMode, results: GameResults) => {
       const outcome = evaluateRun(level, results, mode);
-      const update = applyRun(LEVELS, progress, level.id, outcome, results.score);
+      // Free-play songs never unlock anything: merge them as a list of one.
+      const list = collectionOf(level).kind === 'path' ? collectionOf(level).levels : [level];
+      const update = applyRun(list, progress, level.id, outcome, results.score);
       setProgress(update.progress);
       saveProgress(update.progress);
       setScreen({ name: 'results', level, mode, results, outcome, update });
@@ -119,9 +121,11 @@ export function App() {
         />
       );
     case 'results': {
-      const index = LEVELS.indexOf(screen.level);
-      const next = LEVELS[index + 1];
-      const nextLevel = next && isLevelUnlocked(LEVELS, index + 1, progress) ? next : null;
+      const collection = collectionOf(screen.level);
+      const index = collection.levels.indexOf(screen.level);
+      const next = collection.levels[index + 1];
+      const nextLevel =
+        next && (collection.kind === 'freeplay' || isLevelUnlocked(collection.levels, index + 1, progress)) ? next : null;
       return (
         <ResultsScreen
           level={screen.level}
@@ -169,7 +173,8 @@ export function App() {
     default:
       return (
         <HomeScreen
-          world={WORLDS[0]}
+          collections={COLLECTIONS}
+          world={collectionOf(selected)}
           progress={progress}
           selected={selected}
           onSelect={setSelected}

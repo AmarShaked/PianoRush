@@ -94,6 +94,14 @@ select {
 }
 .star-total { font-weight: 800; color: #ffd93d; background: rgba(255, 217, 61, 0.1); padding: 8px 14px; border-radius: 999px; }
 .world-card h2 { font-size: 1.7rem; margin: 2px 0 0; }
+.collection-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.collection-tab {
+  font: inherit; font-weight: 800; font-size: 1rem; color: var(--muted); background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--panel-border); border-radius: 999px; padding: 8px 16px; cursor: pointer; min-height: 40px;
+}
+.collection-tab.active { color: var(--text); background: rgba(255, 77, 109, 0.16); border-color: var(--accent); }
+.famous { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.06em; color: #ffd93d; text-transform: uppercase; }
+.credit { font-style: italic; margin-top: 0; }
 .level-grid { list-style: none; padding: 0; margin: 10px 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .level-tile {
   position: relative; width: 100%; min-height: 72px; border-radius: 14px; border: 1px solid var(--panel-border);

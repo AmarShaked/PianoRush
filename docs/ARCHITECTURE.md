@@ -152,12 +152,17 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
   - holds and eighths appear only where planned;
   - the faded repeat matches the shown phrase.
 - **Starlight Steps** (the M1 song) is level 10, "First Concert".
+- **Public-domain tunes** (`songs/publicDomain.ts`): Au Clair de la Lune, Ode to Joy, When the Saints, Jingle Bells, Mary Had a Little Lamb and Twinkle Twinkle.
+  - Each has its melody, lanes, a credit, and a chord progression written for Piano Rush.
+  - World 1 uses four of them where the keys fit the skill ladder.
+  - `levels/hits.ts` builds the **Hits** free-play collection from them (`WorldDefinition.kind = 'freeplay'`: all open, separate ids so progress never unlocks World 1).
+  - Only original or public-domain melodies are allowed; licensed songs would need publisher and label rights.
 
 ## Audio engine (`src/audio-engine/`)
 
 | Piece | Role | Tested |
 | ----- | ---- | ------ |
-| `arranger.ts` | Pure: `CompiledSong` + `backing` spec → `BackingNote[]` (drums, bass, pads/keys, clicks) per style. Includes the count-in clicks and an optional metronome. Never includes the melody; pitched parts stay ≤ B3. | Unit tests: determinism, patterns, register, ending, bass coverage per level |
+| `arranger.ts` | Pure: `CompiledSong` + `backing` spec → `BackingNote[]` (drums, bass, pads/keys, clicks) per style (gentle / straight / groove / pop / dance; the energetic styles add phrase crashes and snare-roll fills). Includes the count-in clicks and an optional metronome. Never includes the melody; pitched parts stay ≤ B3. | Unit tests: determinism, patterns, register, ending, bass coverage per level |
 | `schedule.ts` | Pure: `notesInWindow` (consecutive windows never repeat or skip a note); `notesSoundingAt` (re-enter held harmony after a resume) | Unit tests |
 | `ClockSync.ts` | Gameplay ms ↔ audio-context s, using a sliding median of output-timestamp offsets | Unit tests: outliers, drift, device change, fallback |
 | `calibration.ts` | Tap analysis: nearest-click matching, median offset, consistency, reliability, suggested offset; high-latency check | Unit tests |

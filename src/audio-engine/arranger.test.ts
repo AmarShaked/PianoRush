@@ -3,7 +3,7 @@ import { ACCOMPANIMENT_CEILING, arrange, bassRoot, padVoicing, type BackingNote 
 import { notesInWindow, notesSoundingAt } from './schedule';
 import { compileSong } from '../song-content/compile';
 import { chordAt, parseChord } from '../song-content/chords';
-import { WORLD_1 } from '../song-content';
+import { HITS, WORLD_1 } from '../song-content';
 import { SONG_SCHEMA_VERSION, type BackingStyle } from '../song-content/schema';
 
 function song(style: BackingStyle, chords: [number, string][] = [[0, 'C'], [4, 'F'], [8, 'G7'], [12, 'C']]) {
@@ -36,7 +36,7 @@ describe('arrange', () => {
   });
 
   it('never plays in the melody register (no pitched part reaches middle C)', () => {
-    for (const style of ['gentle', 'straight', 'groove'] as const) {
+    for (const style of ['gentle', 'straight', 'groove', 'pop', 'dance'] as const) {
       const pitched = arrange(song(style)).filter((n) => n.midi !== undefined);
       expect(pitched.length).toBeGreaterThan(0);
       expect(Math.max(...pitched.map((n) => n.midi!))).toBeLessThanOrEqual(ACCOMPANIMENT_CEILING);
@@ -74,6 +74,29 @@ describe('arrange', () => {
     expect(notes.filter((n) => n.part === 'keys' && n.beat >= 4 && n.beat < 8).map((n) => n.beat)).toEqual([4.5, 4.5, 4.5, 6.5, 6.5, 6.5]);
   });
 
+  it('dance: four-on-the-floor kick, claps on 2 & 4, off-beat open hats and synth bass', () => {
+    const bar = arrange(song('dance')).filter((n) => n.beat >= 4 && n.beat < 8);
+    expect(bar.filter((n) => n.part === 'kick').map((n) => n.beat)).toEqual([4, 5, 6, 7]);
+    expect(bar.filter((n) => n.part === 'clap').map((n) => n.beat)).toEqual([5, 7]);
+    expect(bar.filter((n) => n.part === 'openhat').map((n) => n.beat)).toEqual([4.5, 5.5, 6.5, 7.5]);
+    expect(bar.filter((n) => n.part === 'synthbass').map((n) => n.beat)).toEqual([4.5, 5.5, 6.5, 7.5]);
+  });
+
+  it('pop: kick 1, and-of-2, 3; backbeat on 2 & 4; eighth-note bass', () => {
+    const bar = arrange(song('pop')).filter((n) => n.beat >= 4 && n.beat < 8);
+    expect(bar.filter((n) => n.part === 'kick').map((n) => n.beat)).toEqual([4, 5.5, 6]);
+    expect(bar.filter((n) => n.part === 'clap').map((n) => n.beat)).toEqual([5, 7]);
+    expect(bar.filter((n) => n.part === 'bass')).toHaveLength(8);
+  });
+
+  it('energetic styles crash on each 4-bar phrase and roll into the next one', () => {
+    const notes = arrange(compileSong({ ...song('dance').definition, notes: [0, 8, 16, 24, 31].map((b) => ({ midi: 60, startBeat: b, durationBeats: 1 })) }));
+    expect(notes.filter((n) => n.part === 'crash').map((n) => n.beat)).toEqual([0, 16, 28]);
+    const roll = notes.filter((n) => n.part === 'snare' && n.beat >= 15 && n.beat < 16);
+    expect(roll.map((n) => n.beat)).toEqual([15, 15.25, 15.5, 15.75]);
+    expect(roll.map((n) => n.velocity)).toEqual([...roll.map((n) => n.velocity)].sort((a, b) => a - b));
+  });
+
   it('ends with one hit and the final chord held to the end of the last bar', () => {
     const notes = arrange(song('groove'));
     const last = notes.filter((n) => n.beat >= 12);
@@ -87,12 +110,14 @@ describe('arrange', () => {
     expect(arrange(s).every((n) => n.part === 'click')).toBe(true);
   });
 
-  it.each(WORLD_1.levels.map((l) => [l.title, l] as const))('%s arranges without gaps in the bass', (_, level) => {
+  it.each([...WORLD_1.levels, ...HITS.levels].map((l) => [l.id, l] as const))('%s has bass in every bar', (_, level) => {
     const s = compileSong(level.song);
     const notes = arrange(s);
     const bpb = level.song.timeSignature[0];
     const bars = Math.ceil(s.totalBeats / bpb);
-    for (let bar = 0; bar < bars; bar++) expect(notes.some((n) => n.part === 'bass' && n.beat === bar * bpb)).toBe(true);
+    for (let bar = 0; bar < bars; bar++) {
+      expect(notes.some((n) => (n.part === 'bass' || n.part === 'synthbass') && n.beat >= bar * bpb && n.beat < (bar + 1) * bpb)).toBe(true);
+    }
   });
 });
 

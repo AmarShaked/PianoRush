@@ -66,6 +66,13 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] **Calibration:** taps on the clicks give a small offset and good consistency, and "Use … ms" updates the input offset
 - [ ] **Bluetooth headphones:** a high-latency warning is shown (where the browser reports latency). After calibration, play feels in time
 
+## Songs & Hits
+- [ ] World 1 levels 3, 5, 6 and 8 are recognisable (Au Clair de la Lune, Ode to Joy, When the Saints, Jingle Bells) and show ★ HIT
+- [ ] Level 1 has the dance beat and feels lively at 100 BPM
+- [ ] The **Hits** tab lists 6 songs, all playable on a fresh profile. Playing them doesn't unlock World 1 levels
+- [ ] Twinkle uses six lanes. `H` (or A4 on the piano) plays the sixth lane
+- [ ] The backing harmonies sound right under each melody (no sour chords)
+
 ## Results
 - [ ] Score, stars, note accuracy, timing accuracy, Perfect/Great/Good/Miss counts, wrong notes and max combo are shown
 - [ ] "New best!" appears the first time, and the personal best appears later

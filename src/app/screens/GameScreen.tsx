@@ -203,7 +203,8 @@ export function GameScreen({ level, song, mode, inputs, settings, virtualPiano, 
         <div className="hud-left">
           <div className="hud-title">
             <span className={`mode-badge mode-${mode}`}>{MODE_LABEL[mode]}</span>
-            {level.number}. {level.title}
+            {level.world > 0 ? `${level.number}. ` : ''}
+            {level.title}
           </div>
           <div className="progress" role="progressbar" aria-label="Level progress">
             <div className="progress-fill" ref={progressRef} />

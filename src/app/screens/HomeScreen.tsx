@@ -13,6 +13,7 @@ import type { useMidi } from '../useMidi';
 import { MODE_LABEL } from './GameScreen';
 
 interface HomeScreenProps {
+  collections: readonly WorldDefinition[];
   world: WorldDefinition;
   progress: ProgressMap;
   selected: LevelDefinition;
@@ -49,17 +50,20 @@ function Slider({ label, value, onChange }: { label: string; value: number; onCh
 }
 
 export function HomeScreen(props: HomeScreenProps) {
-  const { world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate } = props;
+  const { collections, world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate } = props;
   const latency = audioEngine.latency;
   const outputLatencyMs = latency?.output != null ? Math.round(latency.output * 1000) : null;
   const levels = world.levels;
+  const freePlay = world.kind === 'freeplay';
+  const isOpen = (i: number) => freePlay || isLevelUnlocked(levels, i, progress);
   const selectedIndex = levels.indexOf(selected);
-  const unlocked = isLevelUnlocked(levels, selectedIndex, progress);
+  const unlocked = isOpen(selectedIndex);
   const hasInput = midi.listening || settings.keyboardSimulator;
   const song = songFor(selected);
   const seconds = Math.round((song.endMs + song.countInMs) / 1000);
   const p = progress[selected.id];
-  const earned = totalStars(levels, progress);
+  const path = collections.filter((c) => c.kind === 'path').flatMap((c) => c.levels);
+  const earned = totalStars(path, progress);
 
   return (
     <main className="screen home-screen">
@@ -67,20 +71,36 @@ export function HomeScreen(props: HomeScreenProps) {
         <h1 className="logo">
           Piano<span>Rush</span>
         </h1>
-        <div className="star-total" aria-label={`${earned} of ${levels.length * 3} stars collected`}>
-          ★ {earned} / {levels.length * 3}
+        <div className="star-total" aria-label={`${earned} of ${path.length * 3} stars collected`}>
+          ★ {earned} / {path.length * 3}
         </div>
       </header>
 
       <div className="start-grid">
-        <section className="card world-card" aria-labelledby="world-title">
-          <div className="eyebrow">World {world.id}</div>
-          <h2 id="world-title">{world.title}</h2>
+        <section className="card world-card" aria-label={world.title}>
+          <div className="collection-tabs" role="tablist" aria-label="Song collections">
+            {collections.map((c) => (
+              <button
+                key={c.id}
+                role="tab"
+                aria-selected={c === world}
+                className={`collection-tab${c === world ? ' active' : ''}`}
+                onClick={() => {
+                  if (c === world) return;
+                  // Jump to the first open, unfinished entry of that collection.
+                  const first = c.levels.find((l, i) => (c.kind === 'freeplay' || isLevelUnlocked(c.levels, i, progress)) && !progress[l.id]?.completed);
+                  onSelect(first ?? c.levels[0]!);
+                }}
+              >
+                {c.kind === 'path' ? `World ${c.id} · ${c.title}` : `🔥 ${c.title}`}
+              </button>
+            ))}
+          </div>
           <p className="muted small">{world.subtitle}</p>
 
           <ol className="level-grid">
             {levels.map((level, i) => {
-              const open = isLevelUnlocked(levels, i, progress);
+              const open = isOpen(i);
               const lp = progress[level.id];
               const isNext = open && !lp?.completed;
               return (
@@ -91,8 +111,9 @@ export function HomeScreen(props: HomeScreenProps) {
                     aria-pressed={level === selected}
                     aria-label={`Level ${level.number}: ${level.title}${open ? `, ${lp?.bestStars ?? 0} stars` : ', locked'}`}
                   >
-                    <span className="level-num">{open ? level.number : '🔒'}</span>
+                    <span className="level-num">{!open ? '🔒' : freePlay ? '♪' : level.number}</span>
                     <span className="level-name">{level.title}</span>
+                    {!freePlay && level.song.composer.includes('public domain') && <span className="famous" aria-hidden>★ hit</span>}
                     <Stars count={lp?.bestStars ?? 0} small />
                     {lp?.challengeCleared && <span className="trophy" aria-hidden>🏆</span>}
                   </button>
@@ -104,12 +125,14 @@ export function HomeScreen(props: HomeScreenProps) {
           <div className="level-detail">
             <div className="level-detail-head">
               <div>
-                <div className="eyebrow">Level {selected.number}</div>
+                <div className="eyebrow">{freePlay ? 'Free play' : `Level ${selected.number}`}</div>
                 <h3 className="level-title">{selected.title}</h3>
                 <p className="objective">{selected.objective}</p>
                 <p className="muted small">
-                  “{selected.song.title}” · {selected.song.bpm} BPM · {seconds}s · keys {selected.song.lanes.map(midiToNoteName).join(' ')}
+                  {!freePlay && `“${selected.song.title}” · `}
+                  {selected.song.bpm} BPM · {seconds}s · keys {selected.song.lanes.map(midiToNoteName).join(' ')}
                 </p>
+                <p className="muted small credit">{selected.song.composer}</p>
               </div>
               {p && (p.bestScore > 0 || p.discoverPlayed) && (
                 <div className="best">

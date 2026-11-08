@@ -102,6 +102,81 @@ export function hat(ctx: BaseAudioContext, out: AudioNode, t: number, vel: numbe
   return voice(g, [src], t + 0.06);
 }
 
+export function clap(ctx: BaseAudioContext, out: AudioNode, t: number, vel: number): Voice {
+  const g = envGain(ctx, out);
+  const src = ctx.createBufferSource();
+  src.buffer = noise(ctx);
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 1400;
+  bp.Q.value = 0.9;
+  src.connect(bp).connect(g);
+  // Three quick bursts then a short tail: the classic hand-clap shape.
+  g.gain.setValueAtTime(0.0001, t);
+  for (const [dt, level] of [[0, 1], [0.011, 0.8], [0.022, 1]] as const) {
+    g.gain.setValueAtTime(vel * 0.7 * level, t + dt);
+    g.gain.exponentialRampToValueAtTime(vel * 0.12, t + dt + 0.009);
+  }
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+  src.start(t, Math.random() * 0.5);
+  return voice(g, [src], t + 0.2);
+}
+
+export function openHat(ctx: BaseAudioContext, out: AudioNode, t: number, vel: number): Voice {
+  const g = envGain(ctx, out);
+  const src = ctx.createBufferSource();
+  src.buffer = noise(ctx);
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 6500;
+  src.connect(hp).connect(g);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vel * 0.35, t + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  src.start(t, Math.random() * 0.5);
+  return voice(g, [src], t + 0.24);
+}
+
+export function crash(ctx: BaseAudioContext, out: AudioNode, t: number, vel: number): Voice {
+  const g = envGain(ctx, out);
+  const src = ctx.createBufferSource();
+  src.buffer = noise(ctx);
+  src.loop = true;
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 4500;
+  src.connect(hp).connect(g);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vel * 0.28, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+  src.start(t);
+  return voice(g, [src], t + 1.7);
+}
+
+/** Plucky saw bass with a filter "wow" — for dance arrangements. */
+export function synthBass(ctx: BaseAudioContext, out: AudioNode, t: number, midi: number, dur: number, vel: number): Voice {
+  const g = envGain(ctx, out);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.Q.value = 6;
+  lp.frequency.setValueAtTime(1800, t);
+  lp.frequency.exponentialRampToValueAtTime(220, t + Math.max(0.08, dur));
+  lp.connect(g);
+  const o = ctx.createOscillator();
+  o.type = 'sawtooth';
+  o.frequency.value = midiToHz(midi);
+  const sub = ctx.createOscillator();
+  sub.frequency.value = midiToHz(midi);
+  o.connect(lp);
+  sub.connect(g);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vel * 0.4, t + 0.005);
+  g.gain.setTargetAtTime(0, t + Math.max(0.03, dur - 0.03), 0.03);
+  o.start(t);
+  sub.start(t);
+  return voice(g, [o, sub], t + dur + 0.2);
+}
+
 export function bass(ctx: BaseAudioContext, out: AudioNode, t: number, midi: number, dur: number, vel: number): Voice {
   const g = envGain(ctx, out);
   const lp = ctx.createBiquadFilter();

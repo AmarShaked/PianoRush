@@ -9,6 +9,7 @@ export const DEFAULT_KEY_MAP: Readonly<Record<string, number>> = {
   KeyD: 64, // E4
   KeyF: 65, // F4
   KeyG: 67, // G4
+  KeyH: 69, // A4 (six-key songs)
 };
 
 /** Structural subset of KeyboardEvent we rely on. */

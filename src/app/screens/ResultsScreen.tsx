@@ -34,7 +34,7 @@ export function ResultsScreen(props: ResultsScreenProps) {
   const newChallenge = mode === 'challenge' && outcome.completed && !update.previous.challengeCleared;
   const canGoNext = nextLevel !== null && update.current.completed;
 
-  const heading = discover ? 'Practice complete' : outcome.completed ? 'Level complete' : 'Keep practising';
+  const heading = discover ? 'Practice complete' : !outcome.completed ? 'Keep practising' : level.world > 0 ? 'Level complete' : 'Song complete';
   const rows: Array<[string, number, string]> = [
     ['Perfect', results.counts.perfect, 'perfect'],
     ['Great', results.counts.great, 'great'],
@@ -48,9 +48,7 @@ export function ResultsScreen(props: ResultsScreenProps) {
         <div className="eyebrow">
           {heading} · {MODE_LABEL[mode]}
         </div>
-        <h2 id="results-title">
-          {level.number}. {level.title}
-        </h2>
+        <h2 id="results-title">{level.world > 0 ? `${level.number}. ${level.title}` : level.title}</h2>
 
         {!discover && <Stars count={outcome.stars} animate />}
 
@@ -127,7 +125,7 @@ export function ResultsScreen(props: ResultsScreenProps) {
         <div className="overlay-actions">
           {canGoNext && (
             <button className="btn btn-primary" onClick={onNext} autoFocus>
-              Next level: {nextLevel.title} →
+              Next: {nextLevel.title} →
             </button>
           )}
           {discover && (

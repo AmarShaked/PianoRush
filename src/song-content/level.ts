@@ -28,6 +28,8 @@ export interface LevelDefinition {
 
 export interface WorldDefinition {
   readonly id: number;
+  /** `path`: levels unlock in order. `freeplay`: every song is open from the start. */
+  readonly kind: 'path' | 'freeplay';
   readonly title: string;
   readonly subtitle: string;
   readonly levels: readonly LevelDefinition[];

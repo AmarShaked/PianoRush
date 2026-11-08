@@ -1,10 +1,18 @@
 import { compileSong, type CompiledSong } from '../song-content/compile';
-import type { LevelDefinition } from '../song-content/level';
+import type { LevelDefinition, WorldDefinition } from '../song-content/level';
+import { HITS } from '../song-content/levels/hits';
 import { WORLD_1 } from '../song-content/levels/world1';
 
-/** The content catalog. M2 ships World 1; further worlds append here. */
-export const WORLDS = [WORLD_1] as const;
+/** Learning-path worlds (levels unlock in order). Further worlds append here. */
+export const WORLDS: readonly WorldDefinition[] = [WORLD_1];
+/** Everything selectable on the home screen: the path worlds plus free-play lists. */
+export const COLLECTIONS: readonly WorldDefinition[] = [...WORLDS, HITS];
+/** The learning path's levels, in order. */
 export const LEVELS: readonly LevelDefinition[] = WORLDS.flatMap((w) => w.levels);
+
+export function collectionOf(level: LevelDefinition): WorldDefinition {
+  return COLLECTIONS.find((c) => c.levels.includes(level)) ?? WORLD_1;
+}
 
 const compiled = new Map<string, CompiledSong>();
 

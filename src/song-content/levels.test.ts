@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chordAt, compileSong, isChordTone, parseChord, validateSong, WORLD_1 } from './index';
+import { chordAt, compileSong, HITS, isChordTone, parseChord, validateSong, WORLD_1 } from './index';
 
 const levels = WORLD_1.levels;
 
@@ -22,11 +22,28 @@ describe('World 1 levels', () => {
     expect(seconds).toBeLessThanOrEqual(60);
   });
 
-  it.each(levels.map((l) => [l.title, l] as const))('%s uses every lane, starts and ends on C', (_, level) => {
+  it.each(levels.map((l) => [l.title, l] as const))('%s uses every lane and ends on C', (_, level) => {
     const song = compileSong(level.song);
     expect(new Set(song.notes.map((n) => n.midi))).toEqual(new Set(level.song.lanes));
-    expect(song.notes[0]?.midi).toBe(60);
     expect(song.notes.at(-1)?.midi).toBe(60);
+  });
+
+  it('uses famous public-domain tunes where they fit the keys taught so far', () => {
+    expect(levels.map((l) => l.song.title)).toEqual([
+      'Knock Knock', 'Seesaw', 'Au Clair de la Lune', 'Paper Boats', 'Ode to Joy',
+      'When the Saints Go Marching In', 'Frog Pond', 'Jingle Bells', 'Echo Valley', 'Starlight Steps',
+    ]);
+    for (const l of levels) {
+      if (['Au Clair de la Lune', 'Ode to Joy', 'When the Saints Go Marching In', 'Jingle Bells'].includes(l.song.title)) {
+        expect(l.song.composer).toMatch(/public domain/);
+      }
+    }
+  });
+
+  it('every level has an energetic pop / dance / groove backing', () => {
+    for (const l of levels) expect(['pop', 'dance', 'groove']).toContain(l.song.backing!.style);
+    expect(levels[0]!.song.backing!.style).toBe('dance');
+    expect(levels[0]!.song.bpm).toBeGreaterThanOrEqual(100);
   });
 
   it('levels 1–5 add exactly one key each, contiguous white keys from middle C', () => {
@@ -83,8 +100,10 @@ describe('song compilation: events and holds', () => {
   });
 });
 
-describe('World 1 accompaniment', () => {
-  it.each(levels.map((l) => [l.title, l] as const))('%s has a valid backing that covers the whole song', (_, level) => {
+const allSongs = [...levels, ...HITS.levels];
+
+describe('World 1 and Hits accompaniment', () => {
+  it.each(allSongs.map((l) => [l.id, l] as const))('%s has a valid backing that covers the whole song', (_, level) => {
     const song = compileSong(level.song);
     expect(level.song.backing).toBeDefined();
     const chords = level.song.backing!.chords;
@@ -97,7 +116,7 @@ describe('World 1 accompaniment', () => {
    * of the bar) or lasts two beats or more must be a tone of the chord that is
    * sounding, for its whole length. Passing notes on weak beats are free.
    */
-  it.each(levels.map((l) => [l.title, l] as const))('%s: strong-beat and long melody notes are chord tones', (_, level) => {
+  it.each(allSongs.map((l) => [l.id, l] as const))('%s: strong-beat and long melody notes are chord tones', (_, level) => {
     const chords = level.song.backing!.chords;
     const clashes: string[] = [];
     for (const n of level.song.notes) {
@@ -113,8 +132,8 @@ describe('World 1 accompaniment', () => {
     expect(clashes).toEqual([]);
   });
 
-  it('ends every level on a C major chord', () => {
-    for (const l of levels) expect(l.song.backing!.chords.at(-1)![1]).toBe('C');
+  it('ends every song on a C major chord', () => {
+    for (const l of allSongs) expect(l.song.backing!.chords.at(-1)![1]).toBe('C');
   });
 });
 
@@ -133,5 +152,33 @@ describe('chord vocabulary', () => {
   it('rejects unknown symbols', () => {
     expect(parseChord('H')).toBeNull();
     expect(parseChord('Cfoo')).toBeNull();
+  });
+});
+
+describe('Hits (free play)', () => {
+  it('is a free-play list of famous public-domain songs', () => {
+    expect(HITS.kind).toBe('freeplay');
+    expect(HITS.levels.map((l) => l.title)).toEqual([
+      'Ode to Joy', 'Jingle Bells', 'When the Saints Go Marching In', 'Au Clair de la Lune', 'Mary Had a Little Lamb', 'Twinkle Twinkle Little Star',
+    ]);
+    for (const l of HITS.levels) expect(l.song.composer).toMatch(/public domain/);
+  });
+
+  it('uses ids separate from World 1 (separate progress, no unlock side effects)', () => {
+    const w1 = new Set(WORLD_1.levels.map((l) => l.id));
+    for (const l of HITS.levels) expect(w1.has(l.id)).toBe(false);
+  });
+
+  it.each(HITS.levels.map((l) => [l.title, l] as const))('%s is valid, 30–60 s, uses every lane and ends on C', (_, level) => {
+    expect(validateSong(level.song)).toEqual({ valid: true, errors: [] });
+    const song = compileSong(level.song);
+    expect(song.endMs / 1000).toBeGreaterThanOrEqual(30);
+    expect(song.endMs / 1000).toBeLessThanOrEqual(60);
+    expect(new Set(song.notes.map((n) => n.midi))).toEqual(new Set(level.song.lanes));
+    expect(song.notes.at(-1)?.midi).toBe(60);
+  });
+
+  it('every song fits the keyboard simulator (C4–A4: A S D F G H)', () => {
+    for (const l of HITS.levels) for (const m of l.song.lanes) expect([60, 62, 64, 65, 67, 69]).toContain(m);
   });
 });
