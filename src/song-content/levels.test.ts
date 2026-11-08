@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileSong, validateSong, WORLD_1 } from './index';
+import { chordAt, compileSong, isChordTone, parseChord, validateSong, WORLD_1 } from './index';
 
 const levels = WORLD_1.levels;
 
@@ -80,5 +80,58 @@ describe('song compilation: events and holds', () => {
     expect(song.events.map((e) => e.noteIds.length)).toEqual([2, 1]);
     expect(song.notes.map((n) => [n.midi, n.eventId, n.isHold])).toEqual([[60, 0, false], [67, 0, false], [64, 1, true]]);
     expect(song.holdCount).toBe(1);
+  });
+});
+
+describe('World 1 accompaniment', () => {
+  it.each(levels.map((l) => [l.title, l] as const))('%s has a valid backing that covers the whole song', (_, level) => {
+    const song = compileSong(level.song);
+    expect(level.song.backing).toBeDefined();
+    const chords = level.song.backing!.chords;
+    expect(chords[0]![0]).toBe(0);
+    expect(chords.at(-1)![0]).toBeLessThan(song.totalBeats);
+  });
+
+  /*
+   * Consonance rule: every melody note that starts on a strong beat (beat 1 or 3
+   * of the bar) or lasts two beats or more must be a tone of the chord that is
+   * sounding, for its whole length. Passing notes on weak beats are free.
+   */
+  it.each(levels.map((l) => [l.title, l] as const))('%s: strong-beat and long melody notes are chord tones', (_, level) => {
+    const chords = level.song.backing!.chords;
+    const clashes: string[] = [];
+    for (const n of level.song.notes) {
+      const strong = Math.abs(n.startBeat % 2) < 1e-9;
+      if (!strong && n.durationBeats < 2) continue;
+      // Check at the start and at every chord change while the note sounds.
+      const checkpoints = [n.startBeat, ...chords.map(([b]) => b).filter((b) => b > n.startBeat && b < n.startBeat + n.durationBeats)];
+      for (const beat of checkpoints) {
+        const symbol = chordAt(chords, beat)!;
+        if (!isChordTone(parseChord(symbol)!, n.midi)) clashes.push(`beat ${beat}: ${n.midi} over ${symbol}`);
+      }
+    }
+    expect(clashes).toEqual([]);
+  });
+
+  it('ends every level on a C major chord', () => {
+    for (const l of levels) expect(l.song.backing!.chords.at(-1)![1]).toBe('C');
+  });
+});
+
+describe('chord vocabulary', () => {
+  it.each([
+    ['C', [0, 4, 7]],
+    ['Dm', [2, 5, 9]],
+    ['G7', [7, 11, 2, 5]],
+    ['F#m', [6, 9, 1]],
+    ['Bb', [10, 2, 5]],
+    ['Bdim', [11, 2, 5]],
+  ] as const)('%s → %j', (symbol, pcs) => {
+    expect(parseChord(symbol)?.pitchClasses).toEqual(pcs);
+  });
+
+  it('rejects unknown symbols', () => {
+    expect(parseChord('H')).toBeNull();
+    expect(parseChord('Cfoo')).toBeNull();
   });
 });

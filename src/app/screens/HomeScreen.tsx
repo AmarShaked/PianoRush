@@ -6,7 +6,9 @@ import { isLevelUnlocked, totalStars, type ProgressMap } from '../../game-engine
 import { InputPanel } from '../components/InputPanel';
 import { MiniKeyboard } from '../components/MiniKeyboard';
 import { Stars } from '../components/Stars';
-import { TIMING_PRESETS, type Settings, type TimingPreset } from '../storage';
+import { TIMING_PRESETS, type PianoOutput, type Settings, type TimingPreset } from '../storage';
+import { audioEngine } from '../inputs';
+import { isHighLatency } from '../../audio-engine/calibration';
 import type { useMidi } from '../useMidi';
 import { MODE_LABEL } from './GameScreen';
 
@@ -22,6 +24,7 @@ interface HomeScreenProps {
   onSettingsChange: (patch: Partial<Settings>) => void;
   onPlay: () => void;
   onDiagnostics: () => void;
+  onCalibrate: () => void;
 }
 
 const KEY_HINTS: Record<number, string> = Object.fromEntries(
@@ -34,8 +37,21 @@ const MODE_INFO: Record<GameMode, { icon: string; text: string }> = {
   challenge: { icon: '🏆', text: 'Strict timing. Clear it to earn the trophy.' },
 };
 
+function Slider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label className="field slider">
+      <span>
+        {label} <b>{Math.round(value * 100)}%</b>
+      </span>
+      <input type="range" min={0} max={1} step={0.05} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </label>
+  );
+}
+
 export function HomeScreen(props: HomeScreenProps) {
-  const { world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics } = props;
+  const { world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate } = props;
+  const latency = audioEngine.latency;
+  const outputLatencyMs = latency?.output != null ? Math.round(latency.output * 1000) : null;
   const levels = world.levels;
   const selectedIndex = levels.indexOf(selected);
   const unlocked = isLevelUnlocked(levels, selectedIndex, progress);
@@ -146,8 +162,37 @@ export function HomeScreen(props: HomeScreenProps) {
             onKeyboardSimulatorChange={(v) => onSettingsChange({ keyboardSimulator: v })}
           />
 
+          <details className="settings" open>
+            <summary>Sound</summary>
+            <label className="field">
+              <span>Piano sound</span>
+              <select value={settings.pianoOutput} onChange={(e) => onSettingsChange({ pianoOutput: e.target.value as PianoOutput })}>
+                <option value="auto">Auto — built-in unless a MIDI piano is connected</option>
+                <option value="physical">My piano makes the sound</option>
+                <option value="virtual">Built-in piano sound</option>
+              </select>
+              <small className="muted">The backing track never plays your melody, so nothing is doubled.</small>
+            </label>
+            <Slider label="Backing track" value={settings.backingVolume} onChange={(v) => onSettingsChange({ backingVolume: v })} />
+            <Slider label="Built-in piano" value={settings.pianoVolume} onChange={(v) => onSettingsChange({ pianoVolume: v })} />
+            <Slider label="Clicks" value={settings.metronomeVolume} onChange={(v) => onSettingsChange({ metronomeVolume: v })} />
+            <label className="toggle">
+              <input type="checkbox" checked={settings.metronome} onChange={(e) => onSettingsChange({ metronome: e.target.checked })} />
+              <span>Metronome click during songs</span>
+            </label>
+            {outputLatencyMs !== null && (
+              <p className={`small ${isHighLatency(outputLatencyMs / 1000) ? 'warn-text' : 'muted'}`}>
+                Audio output latency: {outputLatencyMs} ms
+                {isHighLatency(outputLatencyMs / 1000) ? ' — high (Bluetooth?). Wired headphones or speakers keep timing tight.' : ''}
+              </p>
+            )}
+          </details>
+
           <details className="settings">
-            <summary>Settings</summary>
+            <summary>Timing &amp; display</summary>
+            <button className="btn btn-secondary btn-small" onClick={onCalibrate}>
+              Calibrate timing…
+            </button>
             <label className="field">
               <span>Timing windows (Discover &amp; Flow)</span>
               <select

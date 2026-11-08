@@ -2,7 +2,7 @@
 
 A rhythm game you play with a **real piano**. Tiles fall toward a hit line in fixed lanes, and each lane is one physical key. You play the key when its tile reaches the line.
 
-Current state: **Milestone 2: World 1 learning path**, built on the M1 playable prototype.
+Current state: **Milestone 3: audio**, built on M1 (playable prototype) and M2 (World 1 learning path).
 
 - **M1** added Web MIDI input, a keyboard simulator, a frame-rate-independent scoring engine and a PixiJS renderer.
 - **M2** adds:
@@ -10,6 +10,12 @@ Current state: **Milestone 2: World 1 learning path**, built on the M1 playable 
   - Discover, Flow and Challenge modes;
   - scoring for long-note releases;
   - chord scoring.
+- **M3** adds:
+  - a generated backing track (drums, bass and chords) in sync with the tiles;
+  - a built-in piano sound;
+  - count-in clicks and an optional metronome;
+  - volume controls;
+  - tap-along timing calibration.
 
 ![Level select with World 1 levels, stars and mode picker](docs/screenshot-home.png)
 
@@ -92,6 +98,19 @@ Completing a level unlocks the next one. Progress, best scores and the chosen mo
 
 **Long notes** are tall tiles with a stripe. Keep the key down until the tile has drained into the line. Releasing early loses the hold bonus, but keeps the hit and the combo.
 
+## Sound
+
+- **Backing track:** every level has a written chord progression and a style (gentle, straight or groove). The game turns them into drums, bass and chords, synthesized live with Web Audio. There are no audio files, so it works offline and everything is original.
+  - The backing **never plays your melody**, and all its pitched parts stay below middle C.
+  - Each progression is checked by a test: every melody note on a strong beat, or two beats or longer, must be a chord tone.
+- **Piano sound** (Settings → Sound):
+  - **My piano makes the sound:** your digital piano plays.
+  - **Built-in piano:** the game plays a synthesized piano for your keys.
+  - **Auto** (the default): built-in when no MIDI piano is connected, so the keyboard simulator isn't silent.
+- **Count-in:** you always hear 4 clicks. An optional **metronome** clicks every beat. There are separate volume sliders for backing, built-in piano and clicks.
+- **Discover:** while the song waits for you, the current chord keeps sounding softly. The groove resumes when you play the note.
+- **Calibration** (Settings → Timing & display → Calibrate timing): tap along to 12 clicks and the game suggests an input offset. It also shows the audio latency your device reports, which is already compensated. If that is high (≥100 ms, typical of Bluetooth), you'll see a warning recommending wired headphones or speakers.
+
 ## Connecting a real MIDI piano
 
 1. Connect the piano to the computer, either over USB ("USB to Host" port) or through a USB-MIDI interface. Turn the piano on.
@@ -125,6 +144,7 @@ src/
   piano-input/    PianoEvent contract, Web MIDI manager, keyboard simulator, held-note tracking
   song-content/   Versioned beat-based song schema, validation, compilation, level definitions, World 1
   game-renderer/  PixiJS presentation (reads engine snapshots, never drives time)
+  audio-engine/   Web Audio: clock mapping, arranger, scheduler, synths, built-in piano, calibration
   app/            React screens, GameSession orchestration, settings persistence
   test/           Shared test helpers and fakes
 docs/
@@ -136,12 +156,19 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design, and [docs/MANUA
 
 ## Known limitations
 
-- **No audio yet.** There is no backing track, metronome click or virtual piano sound. With a physical piano, you hear your piano. With the simulator, play is silent. The count-in and beat pulse are visual only. Audio is M3.
+- **The audio is synthesized, not recorded.** The built-in piano and the backing are simple synths: pleasant, but not a sampled grand piano or a real band.
+- **Calibration measures audio-to-key timing only.** It does not measure display latency separately.
+- **The backing has no hit or miss sound effects.**
 - **Chords are engine-only.** Chord scoring (one musical event, with a rule for partly played chords) is implemented and tested, but World 1 is single-note right-hand content, so no level uses chords yet (PRD: World 5).
 - **Only World 1 exists.** Worlds 2–6 are not authored.
 - **Discover does not slow the tempo.** It stops at each note, but between notes it moves at the song tempo.
 - **No calibration flow.** There is only a manual input offset. Output latency (audio/display) is not measured.
 - **Progress is per browser.** It lives in `localStorage`, with no sync (by design for the MVP).
 - **Safari / iOS have no MIDI input.** This needs a native wrapper or adapter.
+- **Audio sync was verified in headless Chromium, not by ear on real speakers.**
+  - Offline rendering puts notes within 0.1 ms of their target sample.
+  - Live, the scheduled beats keep the exact tempo across a whole level, with under 0.1 ms jitter and no drift.
+  - The mapping between the audio and game clocks stays within 0.2 ms of the browser's timestamps (95th percentile).
+  - Perceived sync on your speakers still needs a human check (see the checklist).
 - **Not yet verified on a physical MIDI piano or a real GPU.** The MIDI path is covered by unit tests against a faked Web MIDI API and was exercised in headless Chromium with the keyboard simulator. 60 FPS has not been measured on real hardware. The headless test container has no GPU, so software rendering reached only about 13 FPS there. Scoring was identical regardless of frame rate. Use `?debug` and the manual checklist on real devices.
 - Phones are supported in landscape at a basic level. Portrait shows a "rotate your device" prompt.

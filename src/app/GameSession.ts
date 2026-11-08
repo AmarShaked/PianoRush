@@ -43,8 +43,9 @@ export class GameSession {
     return this.clock.now();
   }
 
-  start(): void {
-    this.engine.start(this.clock.now());
+  /** Begin the count-in, optionally `delayMs` in the future (gives audio time to queue the first click). */
+  start(delayMs = 0): void {
+    this.engine.start(this.clock.now() + delayMs);
   }
 
   pause(): void {
@@ -61,9 +62,9 @@ export class GameSession {
   }
 
   /** Reset score and timeline and immediately begin a fresh count-in. */
-  restart(): void {
+  restart(delayMs = 0): void {
     this.engine.restart();
-    this.engine.start(this.clock.now());
+    this.engine.start(this.clock.now() + delayMs);
   }
 
   /** Advance the engine to "now" and return the state to draw. Call once per animation frame. */

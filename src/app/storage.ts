@@ -13,7 +13,16 @@ export interface Settings {
   inputOffsetMs: number;
   lastMidiDeviceId: string | null;
   preferredMode: GameMode;
+  /** Who makes the piano sound: your instrument, the built-in synth, or auto (built-in unless a MIDI piano is connected). */
+  pianoOutput: PianoOutput;
+  backingVolume: number;
+  pianoVolume: number;
+  metronomeVolume: number;
+  /** Click on every beat during the song (the count-in always clicks). */
+  metronome: boolean;
 }
+
+export type PianoOutput = 'auto' | 'physical' | 'virtual';
 
 const KEY = 'piano-rush:v1';
 
@@ -38,6 +47,11 @@ export const DEFAULT_SETTINGS: Settings = {
   inputOffsetMs: 0,
   lastMidiDeviceId: null,
   preferredMode: 'flow',
+  pianoOutput: 'auto',
+  backingVolume: 0.8,
+  pianoVolume: 0.9,
+  metronomeVolume: 0.6,
+  metronome: false,
 };
 
 function read(): Stored {

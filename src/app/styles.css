@@ -196,6 +196,16 @@ kbd {
   background: rgba(0, 0, 0, 0.6); padding: 4px 8px; border-radius: 6px; pointer-events: none;
 }
 
+.btn-small { min-height: 40px; padding: 0.5rem 1rem; font-size: 0.9rem; margin: 6px 0; }
+.field.slider { margin: 0.4rem 0; }
+.field.slider input { width: 100%; accent-color: var(--accent-2); }
+.cal-progress { margin: 16px 0; }
+.cal-dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.cal-dot { width: 16px; height: 16px; border-radius: 50%; background: rgba(255, 255, 255, 0.12); }
+.cal-dot.count { width: 10px; height: 10px; margin: 3px 0; }
+.cal-dot.on { background: var(--accent-2); box-shadow: 0 0 10px var(--accent-2); }
+.cal-result { margin: 12px 0; text-align: left; }
+
 /* ---------- results ---------- */
 .results-screen { display: grid; place-items: center; }
 .results-card { width: min(560px, 100%); text-align: center; }

@@ -57,5 +57,14 @@ export const starlightSteps: SongDefinition = {
   countInBeats: 4,
   lanes: [C, D, E, F, G],
   notes: sequence([...phraseA, ...phraseA2, ...phraseB, ...phraseA3]),
+  backing: {
+    style: 'groove',
+    chords: [
+      [0, 'C'], [4, 'Dm'], [8, 'C'], [12, 'G'],
+      [16, 'C'], [20, 'Dm'], [24, 'Dm'], [26, 'C'], [28, 'C'],
+      [32, 'C'], [36, 'Dm'], [38, 'Am'], [40, 'C'], [42, 'G7'], [44, 'G'],
+      [48, 'C'], [52, 'Dm'], [56, 'C'], [59, 'G7'], [60, 'C'],
+    ],
+  },
   difficulty: { level: 1, skills: ['five-finger-position', 'quarter-notes', 'eighth-notes', 'held-notes'] },
 };

@@ -12,20 +12,28 @@ import {
 import type { GameMode, LevelDefinition } from '../song-content/level';
 import type { PianoInputSource } from '../piano-input/types';
 import { LEVELS, songFor, WORLDS } from './catalog';
-import { keyboardSimulator, midiManager } from './inputs';
+import { audioEngine, keyboardSimulator, midiManager } from './inputs';
 import { loadProgress, loadSettings, saveProgress, saveSettings, type Settings } from './storage';
 import { useMidi } from './useMidi';
 import { HomeScreen } from './screens/HomeScreen';
 import { GameScreen } from './screens/GameScreen';
 import { ResultsScreen } from './screens/ResultsScreen';
 import { DiagnosticsScreen } from './screens/DiagnosticsScreen';
+import { CalibrationScreen } from './screens/CalibrationScreen';
 
 const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator];
 const FIRST_LEVEL = LEVELS[0]!;
 
 type Screen =
   | { readonly name: 'home' }
-  | { readonly name: 'game'; readonly run: number; readonly level: LevelDefinition; readonly mode: GameMode; readonly settings: Settings }
+  | {
+      readonly name: 'game';
+      readonly run: number;
+      readonly level: LevelDefinition;
+      readonly mode: GameMode;
+      readonly settings: Settings;
+      readonly virtualPiano: boolean;
+    }
   | {
       readonly name: 'results';
       readonly level: LevelDefinition;
@@ -34,7 +42,8 @@ type Screen =
       readonly outcome: RunOutcome;
       readonly update: ProgressUpdate;
     }
-  | { readonly name: 'diagnostics' };
+  | { readonly name: 'diagnostics' }
+  | { readonly name: 'calibration' };
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
@@ -69,10 +78,13 @@ export function App() {
 
   const startLevel = useCallback(
     (level: LevelDefinition, mode: GameMode) => {
+      // Always called from a click: the moment browsers allow audio to start.
+      audioEngine.unlock();
+      const virtualPiano = settings.pianoOutput === 'virtual' || (settings.pianoOutput === 'auto' && !midiManager.isListening);
       setSelected(level);
       setRun((r) => r + 1);
       // Settings are frozen for the duration of a run.
-      setScreen({ name: 'game', run: run + 1, level, mode, settings });
+      setScreen({ name: 'game', run: run + 1, level, mode, settings, virtualPiano });
     },
     [run, settings],
   );
@@ -101,6 +113,7 @@ export function App() {
           mode={screen.mode}
           inputs={INPUTS}
           settings={screen.settings}
+          virtualPiano={screen.virtualPiano}
           onFinished={(results) => finish(screen.level, screen.mode, results)}
           onQuit={toHome}
         />
@@ -140,6 +153,19 @@ export function App() {
           onBack={toHome}
         />
       );
+    case 'calibration':
+      return (
+        <CalibrationScreen
+          inputs={INPUTS}
+          keyboardSimulatorEnabled={settings.keyboardSimulator}
+          currentOffsetMs={settings.inputOffsetMs}
+          onApply={(offset) => {
+            updateSettings({ inputOffsetMs: offset });
+            toHome();
+          }}
+          onBack={toHome}
+        />
+      );
     default:
       return (
         <HomeScreen
@@ -154,6 +180,7 @@ export function App() {
           onSettingsChange={updateSettings}
           onPlay={() => startLevel(selected, mode)}
           onDiagnostics={() => setScreen({ name: 'diagnostics' })}
+          onCalibrate={() => setScreen({ name: 'calibration' })}
         />
       );
   }

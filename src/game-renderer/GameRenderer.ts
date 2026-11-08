@@ -20,6 +20,7 @@ export interface GameRendererOptions {
   readonly msPerBeat: number;
   readonly totalBeats: number;
   readonly beatsPerBar: number;
+  readonly countInBeats: number;
   /** Beats of music visible above the hit line. */
   readonly lookaheadBeats?: number;
   readonly reducedMotion?: boolean;
@@ -660,7 +661,7 @@ export class GameRenderer {
     let count = '';
     let frac = 0;
     if (s.state === 'countdown') {
-      count = String(Math.max(1, Math.ceil(-s.beat)));
+      count = String(Math.min(Math.round(this.opts.countInBeats), Math.max(1, Math.ceil(-s.beat))));
       frac = s.beat - Math.floor(s.beat);
     } else if (s.state === 'resuming' && s.resumeRemainingMs !== null) {
       const beats = s.resumeRemainingMs / this.opts.msPerBeat;

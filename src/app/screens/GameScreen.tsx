@@ -6,7 +6,9 @@ import { MIDDLE_C, midiToNoteName, midiToPitchClass } from '../../piano-input/no
 import type { PianoInputSource } from '../../piano-input/types';
 import type { CompiledSong } from '../../song-content/compile';
 import type { GameMode, LevelDefinition } from '../../song-content/level';
+import { BackingPlayer } from '../../audio-engine/BackingPlayer';
 import { GameSession, type SessionNotice } from '../GameSession';
+import { audioEngine } from '../inputs';
 import { CHALLENGE_WINDOWS, TIMING_PRESETS, type Settings } from '../storage';
 
 export const MODE_LABEL: Record<GameMode, string> = { discover: 'Discover', flow: 'Flow', challenge: 'Challenge' };
@@ -17,6 +19,8 @@ interface GameScreenProps {
   mode: GameMode;
   inputs: readonly PianoInputSource[];
   settings: Settings;
+  /** Play the built-in piano for the player's keys (virtual piano mode). */
+  virtualPiano: boolean;
   onFinished: (results: GameResults) => void;
   onQuit: () => void;
 }
@@ -26,7 +30,10 @@ const HUD_HEIGHT = 64;
 /** `?debug` in the URL shows an FPS / timing readout for real-device testing. */
 const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
 
-export function GameScreen({ level, song, mode, inputs, settings, onFinished, onQuit }: GameScreenProps) {
+/** Lead time before the count-in so the first click can be queued on time (plus device latency). */
+const startDelayMs = () => 250 + audioEngine.totalLatency * 1000;
+
+export function GameScreen({ level, song, mode, inputs, settings, virtualPiano, onFinished, onQuit }: GameScreenProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const scoreRef = useRef<HTMLSpanElement>(null);
   const comboRef = useRef<HTMLSpanElement>(null);
@@ -85,6 +92,15 @@ export function GameScreen({ level, song, mode, inputs, settings, onFinished, on
     });
     const offNotice = session.onNotice(setNotice);
 
+    // Audio: accompaniment follows the engine's song time; the built-in piano plays the player's keys.
+    audioEngine.setVolumes({ backing: settings.backingVolume, piano: settings.pianoVolume, metronome: settings.metronomeVolume });
+    const backing = new BackingPlayer(audioEngine, session.engine, song, () => performance.now(), { metronome: settings.metronome });
+    const offPiano = virtualPiano
+      ? inputs.map((input) =>
+          input.subscribe((e) => (e.type === 'noteOn' ? audioEngine.pianoNoteOn(e.note, e.velocity) : audioEngine.pianoNoteOff(e.note))),
+        )
+      : [];
+
     // HUD is updated directly (no React re-render per frame).
     let lastScore = -1;
     let lastCombo = -1;
@@ -120,6 +136,7 @@ export function GameScreen({ level, song, mode, inputs, settings, onFinished, on
       lanes,
       msPerBeat: song.msPerBeat,
       totalBeats: song.totalBeats,
+      countInBeats: def.countInBeats,
       beatsPerBar: def.timeSignature[0],
       reducedMotion: settings.reducedMotion,
       showKeyHints: settings.keyboardSimulator && settings.showKeyHints,
@@ -134,7 +151,8 @@ export function GameScreen({ level, song, mode, inputs, settings, onFinished, on
         renderer = r;
         if (import.meta.env.DEV) (window as unknown as { __pianoRushRenderer?: GameRenderer }).__pianoRushRenderer = r;
         r.setFrameSource(frame);
-        session.start();
+        backing.start();
+        session.start(startDelayMs());
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
@@ -149,7 +167,7 @@ export function GameScreen({ level, song, mode, inputs, settings, onFinished, on
         else if (st !== 'finished' && st !== 'ready') session.pause();
       } else if (e.code === 'KeyR' && session.engine.currentState === 'paused') {
         setNotice(null);
-        session.restart();
+        session.restart(startDelayMs());
       }
     };
     const onVisibility = () => {
@@ -165,11 +183,14 @@ export function GameScreen({ level, song, mode, inputs, settings, onFinished, on
       document.removeEventListener('visibilitychange', onVisibility);
       offEngine();
       offNotice();
+      backing.dispose();
+      offPiano.forEach((off) => off());
+      audioEngine.pianoAllOff();
       session.dispose();
       renderer?.destroy();
       sessionRef.current = null;
     };
-  }, [song, mode, inputs, settings]);
+  }, [song, mode, inputs, settings, virtualPiano]);
 
   const session = sessionRef.current;
   const paused = state === 'paused';
@@ -250,7 +271,7 @@ export function GameScreen({ level, song, mode, inputs, settings, onFinished, on
                 className="btn btn-secondary"
                 onClick={() => {
                   setNotice(null);
-                  session?.restart();
+                  session?.restart(startDelayMs());
                 }}
               >
                 Restart

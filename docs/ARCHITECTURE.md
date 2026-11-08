@@ -1,4 +1,4 @@
-# Piano Rush — Architecture (Milestones 1–2)
+# Piano Rush — Architecture (Milestones 1–3)
 
 ## Goals that shaped the design
 
@@ -45,7 +45,10 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
 
   If the player pauses during a wait, the wait is split into a user pause. After resuming, the engine waits again.
 - **Resume uses a frozen countdown.** `resume()` schedules the end of the pause interval `resumeCountdownBeats` into the future. Song time stays frozen until then, and the renderer shows 3-2-1.
-- **Future audio clock:** the `Clock` interface (`game-engine/clock.ts`) is the seam. M3 can supply a clock derived from `AudioContext.getOutputTimestamp()` without engine changes.
+- **Audio follows the same timeline.** The transport's song time places tiles, judges input and drives the backing (see *Audio engine*).
+  - `ClockSync` maps gameplay time to `AudioContext` time from `getOutputTimestamp()` pairs.
+  - A sound scheduled at `toContextTime(t)` is **heard** at gameplay time `t`, which compensates output latency.
+  - The mapping is re-measured every 100 ms as the median of the last ~1.5 s of samples. That makes it immune to stale timestamps, and the two clocks can't drift apart over a song.
 
 ## Game engine
 
@@ -150,6 +153,28 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
   - the faded repeat matches the shown phrase.
 - **Starlight Steps** (the M1 song) is level 10, "First Concert".
 
+## Audio engine (`src/audio-engine/`)
+
+| Piece | Role | Tested |
+| ----- | ---- | ------ |
+| `arranger.ts` | Pure: `CompiledSong` + `backing` spec → `BackingNote[]` (drums, bass, pads/keys, clicks) per style. Includes the count-in clicks and an optional metronome. Never includes the melody; pitched parts stay ≤ B3. | Unit tests: determinism, patterns, register, ending, bass coverage per level |
+| `schedule.ts` | Pure: `notesInWindow` (consecutive windows never repeat or skip a note); `notesSoundingAt` (re-enter held harmony after a resume) | Unit tests |
+| `ClockSync.ts` | Gameplay ms ↔ audio-context s, using a sliding median of output-timestamp offsets | Unit tests: outliers, drift, device change, fallback |
+| `calibration.ts` | Tap analysis: nearest-click matching, median offset, consistency, reliability, suggested offset; high-latency check | Unit tests |
+| `synth.ts` | Instruments built from oscillators, filters and noise (kick, snare, hat, bass, pad, keys, click, piano). Work on any `BaseAudioContext`. | Offline render in Chromium: onsets within 0.1 ms |
+| `AudioEngine.ts` | The `AudioContext`, buses (backing / piano / metronome → master → limiter), unlock-on-gesture, precise `playBacking`, `sustainChord`, built-in piano note on/off, latency info | Headless Chromium checks |
+| `BackingPlayer.ts` | Glue between the engine and the audio. A 25 ms timer queues notes about 120 ms ahead (plus device latency) at exact context times. | Headless Chromium: beat period exact, jitter < 0.1 ms |
+
+**How `BackingPlayer` handles playback:**
+- **Pause, wait, resume and restart:** any state other than `countdown`/`playing` stops queued audio. Restart, resume and the end of a Discover wait carry on from the current song position, re-entering any chord that is still sounding, so the harmony isn't silent.
+- **Discover:** the current chord is held softly while the song waits.
+- **Finish:** the final chord fades out over 1.2 s.
+
+**Mixing and piano output:**
+- The player's piano is the loudest bus, and the backing sits under it.
+- Piano output can be physical, virtual or auto (decided when a level starts). Since the backing never contains the melody, neither mode doubles it.
+- The level starts `250 ms + device latency` after the click, so the first count-in click is queued in time.
+
 ## Renderer
 
 `GameRenderer` (PixiJS v8):
@@ -179,7 +204,8 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
 
 | Future system | Seam |
 | ------------- | ---- |
-| Audio engine / backing tracks (M3) | `Clock` interface; `SongDefinition.backing`; engine `judgment` events for SFX |
+| Recorded backing tracks | `BackingSpec` can gain an audio-file reference; `BackingPlayer` already follows the transport |
+| Sound effects | Engine `note`/`judgment`/`hold` events; add an `effects` bus to `AudioEngine` |
 | Microphone recognition | A `PianoInputSource` with `kind: 'microphone'` that emits `PianoEvent`s |
 | Native MIDI (iOS, desktop wrappers) | A `PianoInputSource` with `kind: 'native-midi'`, or a `MidiAccessLike` bridge |
 | More worlds | Append a `WorldDefinition` to `app/catalog.ts`; lanes, holds and assists come from data |

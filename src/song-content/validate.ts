@@ -1,3 +1,4 @@
+import { parseChord } from './chords';
 import { SONG_SCHEMA_VERSION, type SongDefinition } from './schema';
 
 export interface ValidationResult {
@@ -35,6 +36,16 @@ export function validateSong(song: SongDefinition): ValidationResult {
   song.assist?.fadeRanges?.forEach(([from, to], i) => {
     if (!(Number.isFinite(from) && Number.isFinite(to) && from >= 0 && to > from)) err(`Fade range ${i} is invalid`);
   });
+
+  if (song.backing) {
+    const { chords, style } = song.backing;
+    if (!['gentle', 'straight', 'groove'].includes(style)) err(`Unknown backing style ${String(style)}`);
+    if (chords.length === 0 || chords[0]![0] !== 0) err('Backing chords must start at beat 0');
+    chords.forEach(([beat, symbol], i) => {
+      if (!parseChord(symbol)) err(`Backing chord ${i}: unknown symbol "${symbol}"`);
+      if (i > 0 && !(beat > chords[i - 1]![0])) err(`Backing chord ${i}: beats must increase`);
+    });
+  }
 
   const lastEndByPitch = new Map<number, number>();
   const sorted = [...song.notes].map((n, i) => ({ n, i })).sort((a, b) => a.n.startBeat - b.n.startBeat);

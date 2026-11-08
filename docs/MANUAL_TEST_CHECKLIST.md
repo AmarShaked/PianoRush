@@ -1,4 +1,4 @@
-# Manual test checklist (M1 + M2)
+# Manual test checklist (M1–M3)
 
 Record the browser, OS, piano model and connection type for each run. Tick only what you actually tested.
 
@@ -51,6 +51,20 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] **Hold It (6):** holding long notes to the end shows "HOLD!". Releasing early shows "RELEASED EARLY" and the rest of the tile greys out. The results show "Long notes held x / y"
 - [ ] **Memory Challenge (9):** the second statement of each phrase disappears before the line. The first statement is fully visible
 - [ ] One-key and two-key levels (1, 2) lay out correctly with the MIDDLE C marker
+
+## Sound (M3) — check by ear
+- [ ] Pressing Play gives 4 count-in clicks (the first one accented) in time with the 4-3-2-1 countdown
+- [ ] The backing (drums, bass, chords) starts on beat 1 and stays locked to the tiles to the very end, with no audible drift
+- [ ] A note played exactly as its tile touches the line sounds *with* the backing beat (not flamming before or after)
+- [ ] The backing never plays the melody. With **My piano**, only your piano plays the tune
+- [ ] **Built-in piano:** each key sounds, louder when played harder (MIDI velocity), and it stops when released
+- [ ] **Auto:** the keyboard simulator gets the built-in piano, and a connected MIDI piano does not (no doubled sound)
+- [ ] Pause silences everything. Resume (after 3-2-1) comes back in time, and the current chord re-enters
+- [ ] Discover: the chord sustains softly while waiting, and the groove resumes on the right note
+- [ ] Restart and quitting to the menu stop all audio immediately. The level end fades the last chord
+- [ ] The volume sliders and metronome toggle work and are remembered
+- [ ] **Calibration:** taps on the clicks give a small offset and good consistency, and "Use … ms" updates the input offset
+- [ ] **Bluetooth headphones:** a high-latency warning is shown (where the browser reports latency). After calibration, play feels in time
 
 ## Results
 - [ ] Score, stars, note accuracy, timing accuracy, Perfect/Great/Good/Miss counts, wrong notes and max combo are shown
