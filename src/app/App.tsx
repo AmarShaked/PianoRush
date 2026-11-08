@@ -11,7 +11,8 @@ import {
 import type { GameMode, LevelDefinition } from '../song-content/level';
 import type { PianoInputSource } from '../piano-input/types';
 import { COLLECTIONS, collectionOf, isPlayable, LEVELS, nextInOrder, songFor } from './catalog';
-import { audioEngine, keyboardSimulator, midiManager } from './inputs';
+import { audioEngine, keyboardSimulator, microphoneInput, midiManager } from './inputs';
+import { useMic } from './useMic';
 import { loadProgress, loadSettings, saveProgress, saveSettings, type Settings } from './storage';
 import { useMidi } from './useMidi';
 import { HomeScreen } from './screens/HomeScreen';
@@ -21,7 +22,7 @@ import { DiagnosticsScreen } from './screens/DiagnosticsScreen';
 import { CalibrationScreen } from './screens/CalibrationScreen';
 import { SetupScreen, type SetupStep } from './screens/SetupScreen';
 
-const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator];
+const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator, microphoneInput];
 const FIRST_LEVEL = LEVELS[0]!;
 
 type Screen =
@@ -66,6 +67,7 @@ export function App() {
   }, []);
 
   const midi = useMidi(midiManager, settings.lastMidiDeviceId);
+  const mic = useMic();
 
   // Remember the chosen device so returning players reconnect automatically.
   useEffect(() => {
@@ -84,7 +86,10 @@ export function App() {
     (level: LevelDefinition, mode: GameMode, speed: number = settings.practiceSpeed) => {
       // Always called from a click: the moment browsers allow audio to start.
       audioEngine.unlock();
-      const virtualPiano = settings.pianoOutput === 'virtual' || (settings.pianoOutput === 'auto' && !midiManager.isListening);
+      // Auto: built-in piano only when nothing else makes sound (never on top of an acoustic piano).
+      const virtualPiano =
+        settings.pianoOutput === 'virtual' ||
+        (settings.pianoOutput === 'auto' && !midiManager.isListening && microphoneInput.status !== 'listening');
       setSelected(level);
       setRun((r) => r + 1);
       // Settings are frozen for the duration of a run.
@@ -176,6 +181,7 @@ export function App() {
     case 'setup':
       return (
         <SetupScreen
+          mic={mic}
           key={screen.step}
           initialStep={screen.step}
           midi={midi}
@@ -193,6 +199,7 @@ export function App() {
     default:
       return (
         <HomeScreen
+          mic={mic}
           collections={COLLECTIONS}
           world={collectionOf(selected)}
           progress={progress}

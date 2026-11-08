@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { keyboardSimulator, midiManager } from '../inputs';
+import { keyboardSimulator, microphoneInput, midiManager } from '../inputs';
 import { InputPanel } from '../components/InputPanel';
 import { MiniKeyboard } from '../components/MiniKeyboard';
 import { midiToNoteName } from '../../piano-input/noteNames';
@@ -53,6 +53,7 @@ export function DiagnosticsScreen({ midi, keyboardSimulatorEnabled, onKeyboardSi
       push(e, true);
       refreshHeld();
     });
+    const offMic = microphoneInput.subscribe((e) => push(e, true));
     const offStatus = midiManager.subscribeStatus((s) =>
       setStatusLog((prev) => [`${new Date().toLocaleTimeString()} — ${s.deviceName} ${s.type}`, ...prev].slice(0, 8)),
     );
@@ -61,6 +62,7 @@ export function DiagnosticsScreen({ midi, keyboardSimulatorEnabled, onKeyboardSi
       offRaw();
       offMidi();
       offKeys();
+      offMic();
       offStatus();
       keyboardSimulator.disable();
     };
@@ -118,7 +120,7 @@ export function DiagnosticsScreen({ midi, keyboardSimulatorEnabled, onKeyboardSi
               <dt>Channel</dt>
               <dd>{last.channel + 1}</dd>
               <dt>Source</dt>
-              <dd>{last.source === 'midi' ? 'MIDI' : 'Keyboard simulator'}</dd>
+              <dd>{last.source === 'midi' ? 'MIDI' : last.source === 'microphone' ? 'Microphone (beta)' : 'Keyboard simulator'}</dd>
             </dl>
           ) : (
             <p className="muted">Press a key on your piano (or A S D F G)…</p>

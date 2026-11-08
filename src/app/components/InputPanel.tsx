@@ -1,9 +1,12 @@
 import { DEFAULT_KEY_MAP, keyLabel } from '../../piano-input/KeyboardSimulator';
 import { midiToNoteName } from '../../piano-input/noteNames';
 import type { useMidi } from '../useMidi';
+import type { MicState } from '../useMic';
 
 interface InputPanelProps {
   midi: ReturnType<typeof useMidi>;
+  /** Show the acoustic-piano (microphone) option. */
+  mic?: MicState;
   keyboardSimulator: boolean;
   onKeyboardSimulatorChange: (enabled: boolean) => void;
 }
@@ -12,7 +15,7 @@ const SIM_KEYS = Object.entries(DEFAULT_KEY_MAP)
   .filter(([, note]) => note >= 60 && note <= 69 && ![61, 63, 66, 68].includes(note))
   .map(([code, note]) => [keyLabel(code), midiToNoteName(note)] as const);
 
-export function InputPanel({ midi, keyboardSimulator, onKeyboardSimulatorChange }: InputPanelProps) {
+export function InputPanel({ midi, mic, keyboardSimulator, onKeyboardSimulatorChange }: InputPanelProps) {
   const connectedDevices = midi.devices.filter((d) => d.connected);
   const selected = midi.devices.find((d) => d.id === midi.selectedId);
 
@@ -83,6 +86,40 @@ export function InputPanel({ midi, keyboardSimulator, onKeyboardSimulatorChange 
           </>
         )}
       </section>
+
+      {mic && (
+        <section className="panel-block" aria-labelledby="mic-heading">
+          <h3 id="mic-heading">
+            <span className={`status-dot ${mic.status === 'listening' ? 'ok' : ''}`} aria-hidden />
+            Acoustic piano (microphone) <span className="beta">beta</span>
+          </h3>
+          {mic.status === 'unsupported' && <p className="small muted">This browser can't use the microphone.</p>}
+          {mic.status === 'denied' && (
+            <p className="small warn-text">Microphone access was blocked. Allow it in the site settings and try again.</p>
+          )}
+          {mic.status !== 'unsupported' && mic.status !== 'listening' && (
+            <button className="btn btn-secondary btn-small" onClick={() => void mic.start()} disabled={mic.status === 'requesting'}>
+              {mic.status === 'requesting' ? 'Waiting for permission…' : 'Use microphone'}
+            </button>
+          )}
+          {mic.status === 'listening' && (
+            <>
+              <div className="mic-row">
+                <div className="mic-meter" aria-label="Microphone level">
+                  <div className="mic-meter-fill" style={{ width: `${Math.min(100, mic.level * 600)}%` }} />
+                </div>
+                <span className="small">{mic.lastNote !== null ? `Heard ${midiToNoteName(mic.lastNote)}` : 'Play a note…'}</span>
+                <button className="btn btn-ghost btn-small" onClick={mic.stop}>
+                  Stop
+                </button>
+              </div>
+              <p className="small muted">
+                One note at a time. Use headphones so the backing track doesn't reach the microphone, and calibrate timing once.
+              </p>
+            </>
+          )}
+        </section>
+      )}
 
       <section className="panel-block" aria-labelledby="sim-heading">
         <h3 id="sim-heading">

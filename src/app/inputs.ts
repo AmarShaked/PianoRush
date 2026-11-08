@@ -1,6 +1,7 @@
 import { KeyboardSimulator } from '../piano-input/KeyboardSimulator';
 import { WebMidiManager } from '../piano-input/WebMidiManager';
 import { AudioEngine } from '../audio-engine/AudioEngine';
+import { MicrophoneInput } from '../piano-input/MicrophoneInput';
 
 /**
  * App-wide input adapters. They live for the lifetime of the page so the MIDI
@@ -8,6 +9,8 @@ import { AudioEngine } from '../audio-engine/AudioEngine';
  */
 export const midiManager = new WebMidiManager();
 export const keyboardSimulator = new KeyboardSimulator();
+/** Acoustic piano via the microphone (beta, one note at a time). */
+export const microphoneInput = new MicrophoneInput();
 
 /** App-wide audio engine (one AudioContext for the page's lifetime). */
 export const audioEngine = new AudioEngine();

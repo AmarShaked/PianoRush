@@ -10,9 +10,11 @@ import { TIMING_PRESETS, type PianoOutput, type Settings, type TimingPreset } fr
 import { audioEngine } from '../inputs';
 import { isHighLatency } from '../../audio-engine/calibration';
 import type { useMidi } from '../useMidi';
+import type { MicState } from '../useMic';
 import { MODE_LABEL } from './GameScreen';
 
 interface HomeScreenProps {
+  mic: MicState;
   collections: readonly WorldDefinition[];
   world: WorldDefinition;
   progress: ProgressMap;
@@ -51,16 +53,18 @@ function Slider({ label, value, onChange }: { label: string; value: number; onCh
 }
 
 export function HomeScreen(props: HomeScreenProps) {
-  const { collections, world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate, onSetup } = props;
+  const { mic, collections, world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate, onSetup } = props;
   const latency = audioEngine.latency;
   const outputLatencyMs = latency?.output != null ? Math.round(latency.output * 1000) : null;
   const levels = world.levels;
   const freePlay = world.kind === 'freeplay';
   const isOpen = (i: number) => isPlayable(levels[i]!, progress);
   const selectedIndex = levels.indexOf(selected);
-  const unlocked = isOpen(selectedIndex);
-  const hasInput = midi.listening || settings.keyboardSimulator;
   const song = songFor(selected);
+  const unlocked = isOpen(selectedIndex);
+  const hasInput = midi.listening || settings.keyboardSimulator || mic.status === 'listening';
+  const hasChords = song.events.some((e) => e.noteIds.length > 1);
+
   const seconds = Math.round((song.endMs + song.countInMs) / 1000);
   const p = progress[selected.id];
   const path = collections.filter((c) => c.kind === 'path').flatMap((c) => c.levels);
@@ -202,6 +206,9 @@ export function HomeScreen(props: HomeScreenProps) {
               </p>
             )}
             {unlocked && !hasInput && <p className="small warn-text center">Connect a MIDI piano or enable the keyboard simulator.</p>}
+            {mic.status === 'listening' && !midi.listening && hasChords && (
+              <p className="small warn-text center">This level has chords — the microphone (beta) hears one note at a time. A MIDI piano works best here.</p>
+            )}
           </div>
         </section>
 
@@ -209,6 +216,7 @@ export function HomeScreen(props: HomeScreenProps) {
           <h2 id="input-heading">Connect</h2>
           <InputPanel
             midi={midi}
+            mic={mic}
             keyboardSimulator={settings.keyboardSimulator}
             onKeyboardSimulatorChange={(v) => onSettingsChange({ keyboardSimulator: v })}
           />

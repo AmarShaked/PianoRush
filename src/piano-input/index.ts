@@ -5,3 +5,6 @@ export * from './HeldNotesTracker';
 export * from './WebMidiManager';
 export * from './KeyboardSimulator';
 export * from './keyFinding';
+export * from './pitch';
+export * from './PitchTracker';
+export * from './MicrophoneInput';

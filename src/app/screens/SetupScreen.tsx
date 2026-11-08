@@ -9,10 +9,12 @@ import { LEVELS, songFor } from '../catalog';
 import { audioEngine, keyboardSimulator } from '../inputs';
 import type { PianoOutput, Settings } from '../storage';
 import type { useMidi } from '../useMidi';
+import type { MicState } from '../useMic';
 
 export type SetupStep = 'welcome' | 'input' | 'connect' | 'keys' | 'sound' | 'ready';
 
 interface SetupScreenProps {
+  mic: MicState;
   initialStep?: SetupStep;
   midi: ReturnType<typeof useMidi>;
   inputs: readonly PianoInputSource[];
@@ -30,9 +32,9 @@ const STEPS: SetupStep[] = ['welcome', 'input', 'connect', 'keys', 'sound', 'rea
  * First-launch guide (PRD §10): welcome → input method → connect → find your
  * keys → sound → (optional) calibration → first level. Skippable at any step.
  */
-export function SetupScreen({ initialStep = 'welcome', midi, inputs, settings, onSettingsChange, onCalibrate, onDone }: SetupScreenProps) {
+export function SetupScreen({ mic, initialStep = 'welcome', midi, inputs, settings, onSettingsChange, onCalibrate, onDone }: SetupScreenProps) {
   const [step, setStep] = useState<SetupStep>(initialStep);
-  const [method, setMethod] = useState<'midi' | 'keyboard'>(midi.listening ? 'midi' : 'keyboard');
+  const [method, setMethod] = useState<'midi' | 'keyboard' | 'mic'>(midi.listening ? 'midi' : 'keyboard');
   const index = STEPS.indexOf(step);
   const next = (s: SetupStep) => {
     audioEngine.unlock(); // every "next" is a click: a good moment to allow audio
@@ -88,22 +90,24 @@ export function SetupScreen({ initialStep = 'welcome', midi, inputs, settings, o
                 <b>Computer keyboard</b>
                 <span className="muted small">Try it now with A S D F G — no piano needed.</span>
               </button>
-              <div className="choice disabled" aria-disabled="true">
+              <button className={`choice${method === 'mic' ? ' active' : ''}`} onClick={() => setMethod('mic')} aria-pressed={method === 'mic'}>
                 <span className="choice-icon" aria-hidden>
                   🎤
                 </span>
-                <b>Acoustic piano (microphone)</b>
-                <span className="muted small">Coming in a future update.</span>
-              </div>
+                <b>
+                  Acoustic piano <span className="beta">beta</span>
+                </b>
+                <span className="muted small">Uses the microphone. One note at a time; headphones recommended.</span>
+              </button>
             </div>
             <div className="overlay-actions">
               <button
                 className="btn btn-primary"
                 onClick={() => {
                   if (method === 'keyboard') onSettingsChange({ keyboardSimulator: true });
-                  next(method === 'midi' ? 'connect' : 'keys');
+                  next(method === 'keyboard' ? 'keys' : 'connect');
                 }}
-                disabled={method === 'midi' && !midi.supported}
+                disabled={(method === 'midi' && !midi.supported) || (method === 'mic' && mic.status === 'unsupported')}
               >
                 Continue
               </button>
@@ -111,7 +115,26 @@ export function SetupScreen({ initialStep = 'welcome', midi, inputs, settings, o
           </>
         )}
 
-        {step === 'connect' && (
+        {step === 'connect' && method === 'mic' && (
+          <>
+            <h2 id="setup-title">Listen to your piano</h2>
+            <p className="muted">
+              Place your device near the piano, allow the microphone, and play a note — you should see the meter move and the note name
+              appear. Wear headphones while playing so the band doesn't reach the microphone.
+            </p>
+            <InputPanel midi={midi} mic={mic} keyboardSimulator={settings.keyboardSimulator} onKeyboardSimulatorChange={(v) => onSettingsChange({ keyboardSimulator: v })} />
+            <div className="overlay-actions">
+              <button className="btn btn-primary" onClick={() => next('keys')} disabled={mic.status !== 'listening'}>
+                {mic.status === 'listening' ? 'Continue' : 'Waiting for the microphone…'}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setStep('input')}>
+                Back
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 'connect' && method !== 'mic' && (
           <>
             <h2 id="setup-title">Connect your piano</h2>
             <p className="muted">Plug the piano into this computer with a USB cable (the "USB to Host" port) and switch it on.</p>
@@ -242,12 +265,12 @@ function SoundStep({
   onSettingsChange,
   onContinue,
 }: {
-  method: 'midi' | 'keyboard';
+  method: 'midi' | 'keyboard' | 'mic';
   settings: Settings;
   onSettingsChange: (patch: Partial<Settings>) => void;
   onContinue: () => void;
 }) {
-  const [choice, setChoice] = useState<PianoOutput>(method === 'midi' ? 'physical' : 'virtual');
+  const [choice, setChoice] = useState<PianoOutput>(method === 'keyboard' ? 'virtual' : 'physical');
 
   function playChord() {
     audioEngine.unlock();
