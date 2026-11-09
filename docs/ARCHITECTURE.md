@@ -269,6 +269,30 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
 
 **Sound effects** go through their own `effects` bus in `AudioEngine.playEffect`, triggered by engine judgment, hold and wrong-note events.
 
+## Licensed songs (MIDI import)
+
+- **`song-content/midi/smf.ts`:** a dependency-free Standard MIDI File reader.
+  - Formats 0 and 1, PPQ timing, running status, tempo / time-signature / track-name meta events.
+  - Note on/off pairing per channel.
+  - Multi-channel tracks are split per channel.
+- **`midi/smfWriter.ts`:** builds test fixtures.
+- **`midi/convert.ts`** (`midiToSong`):
+  1. Chooses the player tracks (`suggestMelodyTrack` uses names, then pitch, single-line-ness and note count).
+  2. Cuts the bar range and trims leading silence.
+  3. Snaps to a grid.
+  4. Finds the octave that best fits the hand's comfortable window.
+  5. Splits hands at middle C.
+  6. Reduces each hand to a top/bottom line, or up to 3-note chords.
+  7. Removes same-key overlaps.
+  8. Estimates the key (Krumhansl–Schmuckler) for sharp/flat spelling.
+  9. Infers one triad per half bar from duration-weighted pitch classes of the accompaniment, with the melody at half weight and a bass-root bonus.
+
+  The result is validated like any song, with warnings for tempo/meter changes, range and lane count.
+- **`app/library.ts` ("My Songs"):** IndexedDB records of `{ song, audio?: Blob, license }`, exposed as a free-play collection. Recordings become blob URLs.
+- **Licensed packs:** `catalog.ts` bundles `content/licensed/*.json` via `import.meta.glob`; the folder is git-ignored.
+- **Recorded backing:** `backing.audio = { url, offsetMs }`. `BackingPlayer` keeps only the clicks from the arrangement and starts the recording so that `offsetMs` lines up with beat 0 on the same timeline (latency-compensated). Pauses, waits and restarts stop it, and it resumes from the current position. Slowed-down or section runs use the generated band.
+- **Licence data:** `SongDefinition.license` (holder, reference, territory) is shown on the level.
+
 ## Extension points (not implemented)
 
 | Future system | Seam |

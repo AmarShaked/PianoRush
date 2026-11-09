@@ -10,7 +10,9 @@ import {
 } from '../game-engine/progression';
 import type { GameMode, LevelDefinition } from '../song-content/level';
 import type { PianoInputSource } from '../piano-input/types';
-import { COLLECTIONS, collectionOf, isPlayable, LEVELS, nextInOrder, sectionSongFor, songFor, type PracticeSection } from './catalog';
+import { allCollections, collectionOf, isPlayable, LEVELS, nextInOrder, sectionSongFor, setUserCollections, songFor, type PracticeSection } from './catalog';
+import { deleteMySong, listMySongs, mySongsCollection } from './library';
+import { ImportScreen } from './screens/ImportScreen';
 import { audioEngine, keyboardSimulator, microphoneInput, midiManager, nativeMidi } from './inputs';
 import { useMic } from './useMic';
 import { configKey, describeConfig, offsetFor } from './calibrationKeys';
@@ -50,6 +52,7 @@ type Screen =
     }
   | { readonly name: 'diagnostics' }
   | { readonly name: 'calibration'; readonly returnTo: 'home' | 'setup' }
+  | { readonly name: 'import' }
   | { readonly name: 'setup'; readonly step: SetupStep };
 
 export function App() {
@@ -71,6 +74,17 @@ export function App() {
 
   const midi = useMidi(midiManager, settings.lastMidiDeviceId);
   const mic = useMic();
+  // "My Songs": imported licensed songs from this browser's library.
+  const [collections, setCollections] = useState(allCollections());
+  const reloadLibrary = useCallback(async () => {
+    const stored = await listMySongs();
+    setUserCollections([mySongsCollection(stored)]);
+    setCollections(allCollections());
+    return stored;
+  }, []);
+  useEffect(() => {
+    void reloadLibrary();
+  }, [reloadLibrary]);
   // Native app wrappers (iOS/Android) feed MIDI through window.PianoRushNative.
   const [nativeDevices, setNativeDevices] = useState<string[]>(nativeMidi.isActive ? nativeMidi.deviceNames : []);
   useEffect(() => nativeMidi.onChange(() => setNativeDevices(nativeMidi.deviceNames)), []);
@@ -188,6 +202,20 @@ export function App() {
           onBack={() => setScreen(screen.returnTo === 'setup' ? { name: 'setup', step: 'ready' } : { name: 'home' })}
         />
       );
+    case 'import':
+      return (
+        <ImportScreen
+          onCancel={toHome}
+          onSaved={() => {
+            void reloadLibrary().then(() => {
+              const mine = allCollections().find((c) => c.id === -1);
+              const last = mine?.levels.at(-1);
+              if (last) setSelected(last);
+              toHome();
+            });
+          }}
+        />
+      );
     case 'setup':
       return (
         <SetupScreen
@@ -211,7 +239,11 @@ export function App() {
         <HomeScreen
           mic={mic}
           nativeDevices={nativeDevices}
-          collections={COLLECTIONS}
+          collections={collections}
+          onImport={() => setScreen({ name: 'import' })}
+          onDeleteSong={(level) => {
+            void deleteMySong(level.id).then(() => reloadLibrary().then(() => setSelected(LEVELS[0]!)));
+          }}
           world={collectionOf(selected)}
           progress={progress}
           selected={selected}

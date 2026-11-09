@@ -36,6 +36,7 @@ How each section of the Piano Rush PRD (v1.0) maps to the implementation.
 | 13 | Native wrappers to be evaluated; iOS MIDI must not depend on Safari | ⏭ evaluation + bridge | [PLATFORMS.md](PLATFORMS.md), `NativeMidiBridge` |
 | 14 | 60 FPS target, stable audio, low latency, no drift, backgrounding/disconnect handling, no duplicate scoring, frame-rate-independent scoring | ✅ / 🟡 (60 FPS and latency on real devices) | Frame-rate-independence tests; auto-pause on tab hide or device loss |
 | 15 | No backend; local progress, bests, settings, device preference, calibration; offline assets | ✅ | `localStorage`, service worker |
+| 6.2 / 16 | Licensed content: original, licensed or public domain only. User-uploaded MIDI was out of scope for the MVP and was added at the owner's request for licensed songs | ✅ | MIDI import → My Songs (local only), licensed packs (git-ignored), license metadata |
 | 16 | Out of scope: accounts, cloud, multiplayer, leaderboards, payments, AI songs, uploads, marketplace, social, polyphonic mic, AI coaching | ⏭ | Not built, as specified |
 | 17 | Success criteria 1–8 | ✅ / 🟡 | Covered end to end in headless Chromium with simulated input; real-piano validation pending |
 

@@ -150,6 +150,16 @@ select {
 .speed-badge { background: rgba(76, 201, 240, 0.25); }
 .cal-list { list-style: none; padding: 0; margin: 4px 0; font-size: 0.85rem; }
 .link-btn.inline { display: inline; margin: 0; font-size: 0.8rem; }
+.track-list { list-style: none; padding: 0; margin: 8px 0 20px; max-height: 260px; overflow-y: auto; }
+.track-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--panel-border); }
+.track-list .toggle { margin: 6px 0; }
+input.text {
+  font: inherit; background: #1b1938; color: var(--text); border: 1px solid var(--panel-border); border-radius: 10px;
+  padding: 0.5rem 0.7rem; min-height: 40px; width: 100%;
+}
+.field-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.license-line { color: #ffd59a; margin: 2px 0; }
+.import-screen input[type='file'] { color: var(--muted); }
 .section-practice { margin: 0 0 10px; }
 .section-practice summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; padding: 4px 0; }
 .section-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

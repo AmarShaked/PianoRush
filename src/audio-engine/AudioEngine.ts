@@ -173,6 +173,44 @@ export class AudioEngine {
     this.scheduledCount++;
   }
 
+  /** Decode an encoded audio file (mp3 / wav / ogg / m4a) for a recorded backing track. */
+  async decode(data: ArrayBuffer): Promise<AudioBuffer> {
+    if (!this.ctx) throw new Error('Audio not unlocked');
+    return this.ctx.decodeAudioData(data);
+  }
+
+  /**
+   * Play a recorded backing track from `offsetSec` into the buffer, starting at
+   * context time `when`. Tracked like any backing voice, so pause / wait /
+   * restart stop it.
+   */
+  playRecording(buffer: AudioBuffer, when: number, offsetSec: number): void {
+    const ctx = this.ctx;
+    if (!ctx || offsetSec >= buffer.duration) return;
+    const g = ctx.createGain();
+    g.gain.value = 1;
+    g.connect(this.buses.backing);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(g);
+    const t = Math.max(when, ctx.currentTime);
+    src.start(t, Math.max(0, offsetSec + (t - when)));
+    const end = t + (buffer.duration - offsetSec);
+    this.track({
+      end,
+      stop(at, fadeSec = 0.06) {
+        try {
+          g.gain.cancelScheduledValues(at);
+          g.gain.setTargetAtTime(0, at, Math.max(0.005, fadeSec / 3));
+          src.stop(at + fadeSec + 0.05);
+        } catch {
+          /* already stopped */
+        }
+      },
+    });
+    this.scheduledCount++;
+  }
+
   /** A soft held chord (Discover mode while waiting). Returns a stop function. */
   sustainChord(midis: readonly number[], level = 0.18): () => void {
     const ctx = this.ctx;

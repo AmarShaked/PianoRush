@@ -12,13 +12,48 @@ import { isLevelUnlocked, type ProgressMap } from '../game-engine/progression';
 
 /** Learning-path worlds (levels unlock in order). Further worlds append here. */
 export const WORLDS: readonly WorldDefinition[] = [WORLD_1, WORLD_2, WORLD_3, WORLD_4, WORLD_5, WORLD_6];
+/** Licensed packs bundled from content/licensed/*.json (git-ignored; present only in your own builds). */
+interface LicensedPack {
+  readonly title: string;
+  readonly license?: { readonly holder: string; readonly reference: string; readonly territory?: string };
+  readonly songs: readonly import('../song-content/schema').SongDefinition[];
+}
+const packFiles = import.meta.glob<LicensedPack>('../../content/licensed/*.json', { eager: true, import: 'default' });
+export const LICENSED_PACKS: readonly WorldDefinition[] = Object.values(packFiles).map((pack, p) => ({
+  id: 100 + p,
+  kind: 'freeplay' as const,
+  title: pack.title,
+  subtitle: pack.license ? `Licensed · ${pack.license.holder} ${pack.license.reference}${pack.license.territory ? ` · ${pack.license.territory}` : ''}` : 'Licensed songs',
+  levels: pack.songs.map((song, i) => ({
+    id: `pack${p}-${song.id}`,
+    world: 0,
+    number: i + 1,
+    title: song.title,
+    objective: song.license ? `Licensed: ${song.license.holder} ${song.license.reference}` : 'Licensed song',
+    hand: 'right' as const,
+    song: { ...song, ...(pack.license && !song.license ? { license: pack.license } : {}) },
+    modes: ['discover', 'flow', 'challenge'] as const,
+    completion: { minNoteAccuracy: 0.5 },
+    stars: { two: 0.8, three: 0.95 },
+  })),
+}));
+
 /** Everything selectable on the home screen: the path worlds plus free-play lists. */
-export const COLLECTIONS: readonly WorldDefinition[] = [...WORLDS, HITS];
+export const COLLECTIONS: readonly WorldDefinition[] = [...WORLDS, HITS, ...LICENSED_PACKS];
+
+/** Imported songs ("My Songs") are registered at runtime. */
+let userCollections: WorldDefinition[] = [];
+export function setUserCollections(collections: WorldDefinition[]): void {
+  userCollections = collections;
+}
+export function allCollections(): readonly WorldDefinition[] {
+  return [...COLLECTIONS, ...userCollections];
+}
 /** The learning path's levels, in order. */
 export const LEVELS: readonly LevelDefinition[] = WORLDS.flatMap((w) => w.levels);
 
 export function collectionOf(level: LevelDefinition): WorldDefinition {
-  return COLLECTIONS.find((c) => c.levels.includes(level)) ?? WORLD_1;
+  return allCollections().find((c) => c.levels.includes(level)) ?? WORLD_1;
 }
 
 /**

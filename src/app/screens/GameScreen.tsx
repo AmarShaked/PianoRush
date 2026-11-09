@@ -121,7 +121,18 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
       metronome: settings.metronomeVolume,
       effects: settings.effectsVolume,
     });
-    const backing = new BackingPlayer(audioEngine, session.engine, song, () => performance.now(), { metronome: settings.metronome });
+    // A recorded backing track (licensed recording) is used for full-speed, full-song runs.
+    let backing = new BackingPlayer(audioEngine, session.engine, song, () => performance.now(), { metronome: settings.metronome });
+    const recordingUrl = speed === 1 && !section ? def.backing?.audio?.url : undefined;
+    const loadRecording = recordingUrl
+      ? fetch(recordingUrl)
+          .then((r) => r.arrayBuffer())
+          .then((data) => audioEngine.decode(data))
+          .then((buffer) => {
+            backing = new BackingPlayer(audioEngine, session.engine, song, () => performance.now(), { metronome: settings.metronome, recording: buffer });
+          })
+          .catch(() => undefined) // fall back to the generated band
+      : Promise.resolve();
     const offPiano = virtualPiano
       ? inputs.map((input) =>
           input.subscribe((e) => (e.type === 'noteOn' ? audioEngine.pianoNoteOn(e.note, e.velocity) : audioEngine.pianoNoteOff(e.note))),
@@ -157,7 +168,8 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
     };
 
     // PixiJS is loaded on demand so the menus open instantly.
-    import('../../game-renderer/GameRenderer')
+    loadRecording
+      .then(() => import('../../game-renderer/GameRenderer'))
       .then(({ GameRenderer }) =>
         GameRenderer.create(host, {
       lanes,
@@ -219,7 +231,7 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
       renderer?.destroy();
       sessionRef.current = null;
     };
-  }, [song, mode, inputs, settings, virtualPiano]);
+  }, [song, mode, speed, section, inputs, settings, virtualPiano]);
 
   const session = sessionRef.current;
   const paused = state === 'paused';

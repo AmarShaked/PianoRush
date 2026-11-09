@@ -35,6 +35,13 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] Visual effects Minimal removes bursts and combo, but keeps judgments and wrong-key flashes
 - [ ] Calibrating with two different devices stores two entries under Settings → Calibrated devices, and each is used with its own device
 
+## Licensed songs (import)
+- [ ] My Songs → Import: a format-1 file lists named tracks, and a format-0 file lists one entry per channel. ▶ listen plays the right part
+- [ ] The preview shows the key, the bars, the number of keys and sensible chords. Save needs a license reference and the confirmation
+- [ ] The imported song plays with the generated band in the right key. Changing the grid, hand, bar range or transpose changes the preview
+- [ ] With a recorded backing attached and the bar-1 offset set: the recording lines up with the tiles, pause/resume stays in sync, and 75% speed uses the band instead
+- [ ] Export pack file → put it in `content/licensed/` → `npm run dev`: a 🎬 collection appears. `git status` shows nothing to commit
+
 ## Practice speed, labels, offline (M4)
 - [ ] The 50% and 75% speeds slow the tiles, judging and backing together. The results say "Practice", with no stars and no unlocks
 - [ ] "Note letters on tiles" hides the tile letters, while the key strip keeps its labels

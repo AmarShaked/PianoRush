@@ -3,3 +3,7 @@ dist
 *.tsbuildinfo
 .DS_Store
 coverage
+
+# Licensed content stays out of the public repository
+content/licensed/*.json
+public/licensed/

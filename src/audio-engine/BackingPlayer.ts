@@ -11,6 +11,11 @@ export interface BackingPlayerOptions {
   readonly lookaheadMs?: number;
   /** Timer period for the scheduler (ms). Only decides *when we queue*, not when notes sound. */
   readonly tickMs?: number;
+  /**
+   * A decoded recorded backing track (song.backing.audio). When given, the
+   * generated band is replaced by the recording; count-in / metronome clicks stay.
+   */
+  readonly recording?: AudioBuffer | null;
 }
 
 /**
@@ -37,8 +42,11 @@ export class BackingPlayer {
     private readonly now: () => number = () => performance.now(),
     private readonly options: BackingPlayerOptions = {},
   ) {
-    this.notes = arrange(song, { metronome: options.metronome });
+    const arranged = arrange(song, { metronome: options.metronome });
+    this.notes = options.recording ? arranged.filter((n) => n.part === 'click') : arranged;
   }
+
+  private recordingStarted = false;
 
   start(): void {
     if (this.timer) return;
@@ -70,6 +78,7 @@ export class BackingPlayer {
       for (const n of notesInWindow(this.notes, from, beatNow)) this.queue(n, now, songNow, Infinity);
       this.scheduledUntilBeat = beatNow;
     }
+    if (this.options.recording && !this.recordingStarted) this.startRecording(now, songNow);
     const lookahead = (this.options.lookaheadMs ?? 120) + this.audio.totalLatency * 1000;
     const toBeat = (songNow + lookahead) / msPerBeat;
     for (const n of notesInWindow(this.notes, this.scheduledUntilBeat, toBeat)) this.queue(n, now, songNow);
@@ -90,10 +99,31 @@ export class BackingPlayer {
     this.audio.playBacking(n, this.audio.contextTimeFor(audibleAt), (n.durationBeats * msPerBeat) / 1000, maxLateSec);
   }
 
+  /** Start the recording so its `offsetMs` point lines up with beat 0 of the song timeline. */
+  private startRecording(now: number, songNow: number): void {
+    const recording = this.options.recording!;
+    const offsetMs = this.song.definition.backing?.audio?.offsetMs ?? 0;
+    const lead = 60 + this.audio.totalLatency * 1000;
+    // Song time at which the recording's first sample should be heard.
+    const recordingStartSong = -offsetMs;
+    let audibleAt: number;
+    let positionSec: number;
+    if (songNow + lead < recordingStartSong) {
+      audibleAt = now + (recordingStartSong - songNow);
+      positionSec = 0;
+    } else {
+      audibleAt = now + lead;
+      positionSec = (songNow + lead + offsetMs) / 1000;
+    }
+    this.audio.playRecording(recording, this.audio.contextTimeFor(audibleAt), positionSec);
+    this.recordingStarted = true;
+  }
+
   private onStateChange(state: string): void {
     this.stopSustain?.();
     this.stopSustain = null;
     if (state === 'countdown' || state === 'playing') return; // (re)start from the current position on next tick
+    this.recordingStarted = false;
     this.audio.stopBacking(state === 'finished' ? 1.2 : 0.08);
     this.scheduledUntilBeat = null;
     if (state === 'waiting' && this.song.definition.backing) {

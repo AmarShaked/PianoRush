@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { DEFAULT_KEY_MAP, keyLabel } from '../../piano-input/KeyboardSimulator';
 import { midiToNoteName } from '../../piano-input/noteNames';
 import { isPlayable, songFor, type PracticeSection } from '../catalog';
@@ -34,6 +35,8 @@ interface HomeScreenProps {
   onCalibrate: () => void;
   onSetup: () => void;
   onPracticeSection: (section: PracticeSection) => void;
+  onImport: () => void;
+  onDeleteSong: (level: LevelDefinition) => void;
 }
 
 const KEY_HINTS: Record<number, string> = Object.fromEntries(
@@ -58,9 +61,13 @@ function Slider({ label, value, onChange }: { label: string; value: number; onCh
 }
 
 export function HomeScreen(props: HomeScreenProps) {
-  const { mic, nativeDevices, collections, world, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate, onSetup, onPracticeSection } = props;
+  // A collection with no songs yet (e.g. an empty "My Songs") can still be opened.
+  const [emptyTab, setEmptyTab] = useState<WorldDefinition | null>(null);
+  const { mic, nativeDevices, collections, world: selectedWorld, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate, onSetup, onPracticeSection, onImport, onDeleteSong } = props;
   const latency = audioEngine.latency;
   const outputLatencyMs = latency?.output != null ? Math.round(latency.output * 1000) : null;
+  const world = emptyTab ?? selectedWorld;
+  const mySongs = world.id === -1;
   const levels = world.levels;
   const freePlay = world.kind === 'freeplay';
   const isOpen = (i: number) => isPlayable(levels[i]!, progress);
@@ -97,6 +104,11 @@ export function HomeScreen(props: HomeScreenProps) {
                 className={`collection-tab${c === world ? ' active' : ''}`}
                 onClick={() => {
                   if (c === world) return;
+                  if (c.levels.length === 0) {
+                    setEmptyTab(c);
+                    return;
+                  }
+                  setEmptyTab(null);
                   // Jump to the first open, unfinished entry of that collection.
                   const first = c.levels.find((l) => isPlayable(l, progress) && !progress[l.id]?.completed);
                   onSelect(first ?? c.levels[0]!);
@@ -107,14 +119,22 @@ export function HomeScreen(props: HomeScreenProps) {
                     <span className="tab-num">{c.id}</span> {c.title}
                   </>
                 ) : (
-                  `🔥 ${c.title}`
+                  `${c.id === -1 ? '🎵' : c.id >= 100 ? '🎬' : '🔥'} ${c.title}`
                 )}
               </button>
             ))}
           </div>
           <p className="muted small">{world.subtitle}</p>
+          {mySongs && (
+            <button className="btn btn-secondary btn-small" onClick={onImport}>
+              + Import a licensed song (MIDI)
+            </button>
+          )}
+          {mySongs && levels.length === 0 && (
+            <p className="small muted">No imported songs yet. Import a MIDI file you hold the rights to — it stays in this browser.</p>
+          )}
 
-          <ol className="level-grid">
+          {levels.length > 0 && <ol className="level-grid">
             {levels.map((level, i) => {
               const open = isOpen(i);
               const lp = progress[level.id];
@@ -123,7 +143,10 @@ export function HomeScreen(props: HomeScreenProps) {
                 <li key={level.id}>
                   <button
                     className={`level-tile${level === selected ? ' selected' : ''}${open ? '' : ' locked'}${isNext ? ' next' : ''}`}
-                    onClick={() => onSelect(level)}
+                    onClick={() => {
+                      setEmptyTab(null);
+                      onSelect(level);
+                    }}
                     aria-pressed={level === selected}
                     aria-label={`Level ${level.number}: ${level.title}${open ? `, ${lp?.bestStars ?? 0} stars` : ', locked'}`}
                   >
@@ -136,9 +159,9 @@ export function HomeScreen(props: HomeScreenProps) {
                 </li>
               );
             })}
-          </ol>
+          </ol>}
 
-          <div className="level-detail">
+          {levels.length > 0 && <div className="level-detail">
             <div className="level-detail-head">
               <div>
                 <div className="eyebrow">{freePlay ? 'Free play' : `Level ${selected.number}`}</div>
@@ -149,6 +172,13 @@ export function HomeScreen(props: HomeScreenProps) {
                   {selected.song.bpm} BPM · {seconds}s · keys {selected.song.lanes.map((m) => midiToNoteName(m, selected.song.preferFlats)).join(' ')}
                 </p>
                 <p className="muted small credit">{selected.song.composer}</p>
+                {selected.song.license && (
+                  <p className="small license-line">
+                    Licensed: {selected.song.license.holder} {selected.song.license.reference}
+                    {selected.song.license.territory ? ` · ${selected.song.license.territory}` : ''}
+                    {selected.song.backing?.audio ? ' · recorded backing' : ''}
+                  </p>
+                )}
               </div>
               {p && (p.bestScore > 0 || p.discoverPlayed) && (
                 <div className="best">
@@ -213,10 +243,15 @@ export function HomeScreen(props: HomeScreenProps) {
               </p>
             )}
             {unlocked && !hasInput && <p className="small warn-text center">Connect a MIDI piano or enable the keyboard simulator.</p>}
+            {mySongs && (
+              <button className="link-btn" onClick={() => onDeleteSong(selected)}>
+                Remove “{selected.title}” from My Songs
+              </button>
+            )}
             {mic.status === 'listening' && !midi.listening && hasChords && (
               <p className="small warn-text center">This level has chords — the microphone (beta) hears one note at a time. A MIDI piano works best here.</p>
             )}
-          </div>
+          </div>}
         </section>
 
         <section className="card" aria-labelledby="input-heading">
