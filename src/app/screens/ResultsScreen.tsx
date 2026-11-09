@@ -9,6 +9,8 @@ interface ResultsScreenProps {
   level: LevelDefinition;
   mode: GameMode;
   speed: number;
+  /** Played with the melody guide (practice). */
+  guided?: boolean;
   section?: PracticeSection | null;
   results: GameResults;
   outcome: RunOutcome;
@@ -31,9 +33,9 @@ function offsetAdvice(mean: number | null): string | null {
 }
 
 export function ResultsScreen(props: ResultsScreenProps) {
-  const { level, mode, speed, section = null, results, outcome, update, nextLevel, onRetry, onPlayMode, onNext, onMenu } = props;
+  const { level, mode, speed, section = null, guided = false, results, outcome, update, nextLevel, onRetry, onPlayMode, onNext, onMenu } = props;
   const discover = mode === 'discover';
-  const slowed = !discover && (speed < 1 || section !== null);
+  const slowed = !discover && (speed < 1 || section !== null || guided);
   const advice = discover ? null : offsetAdvice(results.meanOffsetMs);
   const newChallenge = mode === 'challenge' && outcome.completed && !update.previous.challengeCleared;
   const canGoNext = nextLevel !== null && update.current.completed;
@@ -53,6 +55,7 @@ export function ResultsScreen(props: ResultsScreenProps) {
           {heading} · {MODE_LABEL[mode]}
           {speed < 1 ? ` · ${Math.round(speed * 100)}% speed` : ''}
           {section ? ` · bars ${section.firstBar}–${section.lastBar} ×${section.repeats}` : ''}
+          {guided ? ' · melody guide' : ''}
         </div>
         <h2 id="results-title">{level.world > 0 ? `${level.number}. ${level.title}` : level.title}</h2>
 
@@ -77,8 +80,8 @@ export function ResultsScreen(props: ResultsScreenProps) {
             {discover && <p className="msg">Nice work learning the notes. Try Flow mode to earn stars.</p>}
             {slowed && (
               <p className="msg">
-                {section ? 'Section practice' : `Practice at ${Math.round(speed * 100)}% speed`}. Play the whole level at full speed to earn
-                stars.
+                {section ? 'Section practice' : speed < 1 ? `Practice at ${Math.round(speed * 100)}% speed` : 'Played with the melody guide'}.{' '}
+                {guided ? 'Now try it on your own, at full speed, to earn stars.' : 'Play the whole level at full speed to earn stars.'}
               </p>
             )}
             {outcome.ranked && !outcome.completed && (
@@ -142,7 +145,7 @@ export function ResultsScreen(props: ResultsScreenProps) {
           )}
           {(discover || slowed) && (
             <button className="btn btn-primary" onClick={() => onPlayMode('flow', 1)} autoFocus={!canGoNext}>
-              ▶ Play the whole level (Flow, full speed)
+              ▶ {guided && speed === 1 && !section ? 'Play it on your own' : 'Play the whole level'} (Flow, full speed{guided ? ', no guide' : ''})
             </button>
           )}
           <button

@@ -2,7 +2,7 @@ import { chordAt, parseChord, type Chord } from '../song-content/chords';
 import type { CompiledSong } from '../song-content/compile';
 import type { BackingStyle } from '../song-content/schema';
 
-export type BackingPart = 'kick' | 'snare' | 'clap' | 'hat' | 'openhat' | 'crash' | 'bass' | 'synthbass' | 'pad' | 'keys' | 'lead' | 'click';
+export type BackingPart = 'kick' | 'snare' | 'clap' | 'hat' | 'openhat' | 'crash' | 'bass' | 'synthbass' | 'pad' | 'keys' | 'lead' | 'melody' | 'click';
 
 /** One accompaniment event in musical time. Pitched parts carry a MIDI note. */
 export interface BackingNote {
@@ -19,6 +19,11 @@ export interface BackingNote {
 export interface ArrangeOptions {
   /** Click on every beat of the song (the count-in always clicks). */
   readonly metronome?: boolean;
+  /**
+   * Also play the player's own part on the built-in piano at this velocity
+   * (0..1): soft as a melody guide, full in Listen mode. Off when 0 / unset.
+   */
+  readonly melody?: number;
 }
 
 /** Highest MIDI note of the default accompaniment register (just below middle C). */
@@ -59,8 +64,9 @@ export function bassRoot(chord: Chord, base = 36): number {
 
 /**
  * Generate the accompaniment for a song from its `backing` spec: drums, bass,
- * pads/keys and clicks. Pure and deterministic. The melody is never included,
- * and every pitched part stays below middle C, so it can't double the player.
+ * pads/keys and clicks. Pure and deterministic. The player's part is only
+ * included when asked for (`melody`); every band part stays out of the
+ * player's register, so the band never doubles the player.
  */
 export function arrange(song: CompiledSong, options: ArrangeOptions = {}): BackingNote[] {
   const def = song.definition;
@@ -75,6 +81,12 @@ export function arrange(song: CompiledSong, options: ArrangeOptions = {}): Backi
   const endBeat = Math.ceil(song.totalBeats / bpb - 1e-9) * bpb;
   if (options.metronome) {
     for (let b = 0; b < endBeat; b++) out.push({ part: 'click', beat: b, durationBeats: 0.1, velocity: 0.7, accent: b % bpb === 0 });
+  }
+
+  // The player's part on the piano (melody guide / Listen mode). Unlike every
+  // other part this deliberately doubles the player.
+  if (options.melody) {
+    for (const n of song.notes) out.push({ part: 'melody', beat: n.startBeat, durationBeats: n.durationBeats, velocity: options.melody, midi: n.midi });
   }
 
   const spec = def.backing;

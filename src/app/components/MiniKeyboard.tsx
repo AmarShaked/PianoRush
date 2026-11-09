@@ -11,6 +11,8 @@ interface MiniKeyboardProps {
   pressed?: ReadonlySet<number> | readonly number[];
   /** Label lane keys with their computer-keyboard shortcut. */
   keyHints?: Readonly<Record<number, string>>;
+  /** Spell black keys as flats (B♭ rather than A♯). */
+  preferFlats?: boolean;
   className?: string;
 }
 
@@ -21,7 +23,7 @@ const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
  * real keyboard (with middle C marked), and to visualise held notes in
  * diagnostics.
  */
-export function MiniKeyboard({ from, to, lanes = [], pressed = [], keyHints = {}, className }: MiniKeyboardProps) {
+export function MiniKeyboard({ from, to, lanes = [], pressed = [], keyHints = {}, preferFlats = false, className }: MiniKeyboardProps) {
   const pressedSet = pressed instanceof Set ? pressed : new Set(pressed as readonly number[]);
   const whites: number[] = [];
   for (let m = from; m <= to; m++) if (!isBlackKey(m)) whites.push(m);
@@ -40,7 +42,7 @@ export function MiniKeyboard({ from, to, lanes = [], pressed = [], keyHints = {}
       viewBox={`0 -26 ${width} ${H + 30}`}
       role="img"
       aria-label={`Piano keyboard from ${midiToNoteName(from)} to ${midiToNoteName(to)}${
-        lanes.length ? `; game keys: ${lanes.map((m) => midiToNoteName(m)).join(', ')}` : ''
+        lanes.length ? `; game keys: ${lanes.map((m) => midiToNoteName(m, preferFlats)).join(', ')}` : ''
       }`}
     >
       {whites.map((m) => {
@@ -67,16 +69,27 @@ export function MiniKeyboard({ from, to, lanes = [], pressed = [], keyHints = {}
       })}
       {blacks.map((m) => {
         const x = whiteX.get(m - 1)! + W * 0.68;
+        const bw = W * 0.64;
+        const bh = H * 0.6;
+        const lane = laneIndex(m);
+        const color = lane >= 0 ? hex(laneColor(lane)) : null;
+        // Game keys among the black keys get their lane colour too (outline, top band, label).
+        const fill = pressedSet.has(m) ? (color ?? '#8fd3ff') : color ? '#34344a' : '#141420';
         return (
-          <rect
-            key={m}
-            x={x}
-            y={0}
-            width={W * 0.64}
-            height={H * 0.6}
-            rx={2}
-            fill={pressedSet.has(m) ? '#8fd3ff' : '#141420'}
-          />
+          <g key={m}>
+            <rect x={x} y={0} width={bw} height={bh} rx={2} fill={fill} stroke={color ?? 'none'} strokeWidth={color ? 1.5 : 0} />
+            {color && <rect x={x} y={0} width={bw} height={6} fill={color} />}
+            {color && (
+              <text x={x + bw / 2} y={bh - 6} textAnchor="middle" className="mk-label mk-label-black">
+                {midiToNoteName(m, preferFlats).replace(/-?\d+$/, '')}
+              </text>
+            )}
+            {color && keyHints[m] && (
+              <text x={x + bw / 2} y={bh - 20} textAnchor="middle" className="mk-hint mk-hint-black">
+                {keyHints[m]}
+              </text>
+            )}
+          </g>
         );
       })}
       {whiteX.has(MIDDLE_C) && (

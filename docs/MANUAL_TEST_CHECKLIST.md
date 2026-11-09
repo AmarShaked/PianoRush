@@ -130,3 +130,10 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] 1920×1080, 1366×768 and 1024×768 (tablet) look correct in landscape
 - [ ] Resizing the window while playing re-lays out the lanes correctly
 - [ ] Phone portrait shows the "rotate your device" prompt
+
+## Listen and melody guide
+- [ ] **👂 Listen** on Dance Monkey: the built-in piano plays the tune in time with the tiles reaching the line (no audible lag on your speakers), the keys light up, and the song returns to the menu at the end
+- [ ] Listen at 50% speed is slower and still in sync; pausing and resuming carries on cleanly
+- [ ] **🎹 Melody guide** in Flow: the guide is clearly softer than your own playing, sits in time with the band, and the results say "melody guide" with no stars
+- [ ] Melody guide in Discover: when the song stops to wait, the waited-for note sounds once, softly
+- [ ] On the level details, black-key lanes (e.g. Dance Monkey's F♯, G♯, C♯) are coloured on the mini keyboard

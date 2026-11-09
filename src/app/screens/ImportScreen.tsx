@@ -270,7 +270,7 @@ export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
                 {result.song.bpm} BPM · {result.song.timeSignature.join('/')} · {result.stats.key}
                 {result.stats.transpose ? ` · moved ${result.stats.transpose > 0 ? '+' : ''}${result.stats.transpose}` : ''}
               </p>
-              <MiniKeyboard className="guide-keyboard" from={36} to={95} lanes={result.song.lanes} />
+              <MiniKeyboard className="guide-keyboard" from={36} to={95} lanes={result.song.lanes} preferFlats={result.song.preferFlats} />
               <p className="small muted">
                 Chords: {result.song.backing!.chords.slice(0, 10).map(([, c]) => c).join(' · ')}
                 {result.song.backing!.chords.length > 10 ? ' …' : ''}

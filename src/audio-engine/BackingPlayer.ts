@@ -7,6 +7,10 @@ import { notesInWindow, notesSoundingAt } from './schedule';
 
 export interface BackingPlayerOptions {
   readonly metronome?: boolean;
+  /** Play the player's part on the built-in piano at this velocity (0..1; see ArrangeOptions.melody). */
+  readonly melody?: number;
+  /** Discover: when the song stops to wait, softly play the notes it is waiting for. */
+  readonly hintOnWait?: boolean;
   /** Extra scheduling lookahead on top of the device latency (ms). */
   readonly lookaheadMs?: number;
   /** Timer period for the scheduler (ms). Only decides *when we queue*, not when notes sound. */
@@ -42,8 +46,8 @@ export class BackingPlayer {
     private readonly now: () => number = () => performance.now(),
     private readonly options: BackingPlayerOptions = {},
   ) {
-    const arranged = arrange(song, { metronome: options.metronome });
-    this.notes = options.recording ? arranged.filter((n) => n.part === 'click') : arranged;
+    const arranged = arrange(song, { metronome: options.metronome, melody: options.melody });
+    this.notes = options.recording ? arranged.filter((n) => n.part === 'click' || n.part === 'melody') : arranged;
   }
 
   private recordingStarted = false;
@@ -126,11 +130,18 @@ export class BackingPlayer {
     this.recordingStarted = false;
     this.audio.stopBacking(state === 'finished' ? 1.2 : 0.08);
     this.scheduledUntilBeat = null;
-    if (state === 'waiting' && this.song.definition.backing) {
+    if (state !== 'waiting') return;
+    const stops: Array<() => void> = [];
+    if (this.song.definition.backing) {
       // Discover: keep the current harmony softly in the air while the song waits.
       const beat = this.game.songTimeAt(this.now()) / this.song.msPerBeat;
       const chord = parseChord(chordAt(this.song.definition.backing.chords, Math.max(0, beat)) ?? 'C');
-      if (chord) this.stopSustain = this.audio.sustainChord(padVoicing(chord, registersFor(this.song.definition.lanes).chordBase));
+      if (chord) stops.push(this.audio.sustainChord(padVoicing(chord, registersFor(this.song.definition.lanes).chordBase)));
     }
+    if (this.options.hintOnWait) {
+      const waitingFor = this.game.getSnapshot(this.now()).waitingFor;
+      if (waitingFor.length) stops.push(this.audio.hint(waitingFor));
+    }
+    if (stops.length) this.stopSustain = () => stops.forEach((stop) => stop());
   }
 }

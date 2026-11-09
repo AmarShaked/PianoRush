@@ -128,7 +128,7 @@ export class AudioEngine {
     if (!ctx) return;
     const t = Math.max(when, ctx.currentTime);
     if (when < ctx.currentTime - maxLateSec) return; // too late to be in time: drop rather than smear
-    const out = note.part === 'click' ? this.buses.metronome : this.buses.backing;
+    const out = note.part === 'click' ? this.buses.metronome : note.part === 'melody' ? this.buses.piano : this.buses.backing;
     const v = note.velocity;
     let voice: Voice;
     switch (note.part) {
@@ -165,6 +165,12 @@ export class AudioEngine {
       case 'lead':
         voice = lead(ctx, out, t, note.midi ?? 72, durationSec, v);
         break;
+      case 'melody': {
+        // The built-in piano playing the player's part (melody guide / Listen); released at the note's end.
+        voice = piano(ctx, out, t, note.midi ?? 60, Math.round(v * 127));
+        voice.stop(t + durationSec, 0.15);
+        break;
+      }
       case 'click':
         voice = click(ctx, out, t, note.accent ?? false, v);
         break;
@@ -219,6 +225,16 @@ export class AudioEngine {
     const voices = midis.map((m) => pad(ctx, this.buses.backing, t, m, 600, level));
     voices.forEach((v) => this.track(v));
     return () => voices.forEach((v) => v.stop(ctx.currentTime, 0.25));
+  }
+
+  /** Softly sound the notes the player should play (Discover hint while the song waits). Returns a stop function. */
+  hint(midis: readonly number[], velocity = 0.5): () => void {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') return () => undefined;
+    const t = ctx.currentTime + 0.02;
+    const voices = midis.map((m) => piano(ctx, this.buses.piano, t, m, Math.round(velocity * 127)));
+    voices.forEach((v) => this.track(v));
+    return () => voices.forEach((v) => v.stop(ctx.currentTime, 0.12));
   }
 
   /** Stop all scheduled / sounding accompaniment (pause, wait, restart, quit). */

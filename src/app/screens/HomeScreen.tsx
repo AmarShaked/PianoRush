@@ -31,6 +31,8 @@ interface HomeScreenProps {
   settings: Settings;
   onSettingsChange: (patch: Partial<Settings>) => void;
   onPlay: () => void;
+  /** Listen mode: watch and hear the song played for you. */
+  onListen: () => void;
   onDiagnostics: () => void;
   onCalibrate: () => void;
   onSetup: () => void;
@@ -63,7 +65,7 @@ function Slider({ label, value, onChange }: { label: string; value: number; onCh
 export function HomeScreen(props: HomeScreenProps) {
   // A collection with no songs yet (e.g. an empty "My Songs") can still be opened.
   const [emptyTab, setEmptyTab] = useState<WorldDefinition | null>(null);
-  const { mic, nativeDevices, collections, world: selectedWorld, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onDiagnostics, onCalibrate, onSetup, onPracticeSection, onImport, onDeleteSong } = props;
+  const { mic, nativeDevices, collections, world: selectedWorld, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onListen, onDiagnostics, onCalibrate, onSetup, onPracticeSection, onImport, onDeleteSong } = props;
   const latency = audioEngine.latency;
   const outputLatencyMs = latency?.output != null ? Math.round(latency.output * 1000) : null;
   const world = emptyTab ?? selectedWorld;
@@ -194,6 +196,7 @@ export function HomeScreen(props: HomeScreenProps) {
               to={Math.max(83, Math.ceil((Math.max(...selected.song.lanes) + 1) / 12) * 12 - 1)}
               lanes={selected.song.lanes}
               keyHints={settings.keyboardSimulator ? KEY_HINTS : {}}
+              preferFlats={selected.song.preferFlats}
             />
 
             <div className="mode-picker" role="radiogroup" aria-label="Game mode">
@@ -229,12 +232,27 @@ export function HomeScreen(props: HomeScreenProps) {
               {settings.practiceSpeed < 1 && <span className="small muted">practice: no stars</span>}
             </div>
 
+            <label className="guide-toggle">
+              <input type="checkbox" checked={settings.melodyGuide} onChange={(e) => onSettingsChange({ melodyGuide: e.target.checked })} />
+              <span>
+                🎹 <b>Melody guide</b>: the piano plays the tune softly with you
+                {mode === 'discover' ? ' (and plays each note the song waits for)' : ''}
+                {settings.melodyGuide && <span className="muted"> · practice: no stars</span>}
+              </span>
+            </label>
+
             <SectionPractice level={selected} disabled={!unlocked || !hasInput} onPick={onPracticeSection} />
 
-            <button className="btn btn-primary btn-play" onClick={onPlay} disabled={!unlocked || !hasInput}>
-              ▶ Play {MODE_LABEL[mode]}
-              {settings.practiceSpeed < 1 ? ` · ${settings.practiceSpeed * 100}%` : ''}
-            </button>
+            <div className="play-row">
+              <button className="btn btn-secondary btn-listen" onClick={onListen} title="Watch and hear the whole song played for you (no score)">
+                👂 Listen
+              </button>
+              <button className="btn btn-primary btn-play" onClick={onPlay} disabled={!unlocked || !hasInput}>
+                ▶ Play {MODE_LABEL[mode]}
+                {settings.practiceSpeed < 1 ? ` · ${settings.practiceSpeed * 100}%` : ''}
+                {settings.melodyGuide ? ' · with guide' : ''}
+              </button>
+            </div>
             {!unlocked && (
               <p className="small warn-text center">
                 {selected.number === 1

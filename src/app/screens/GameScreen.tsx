@@ -7,6 +7,7 @@ import type { PianoInputSource } from '../../piano-input/types';
 import type { CompiledSong } from '../../song-content/compile';
 import type { GameMode, LevelDefinition } from '../../song-content/level';
 import { BackingPlayer } from '../../audio-engine/BackingPlayer';
+import { AutoPlayer } from '../../game-engine/AutoPlayer';
 import { GameSession, type SessionNotice } from '../GameSession';
 import type { PracticeSection } from '../catalog';
 import { audioEngine } from '../inputs';
@@ -26,6 +27,10 @@ interface GameScreenProps {
   settings: Settings;
   /** Play the built-in piano for the player's keys (virtual piano mode). */
   virtualPiano: boolean;
+  /** Listen mode: the game plays the song perfectly for you; no score is kept. */
+  listen?: boolean;
+  /** Melody guide: the built-in piano plays the player's part softly along with them. */
+  guide?: boolean;
   onFinished: (results: GameResults) => void;
   onQuit: () => void;
 }
@@ -38,7 +43,11 @@ const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.se
 /** Lead time before the count-in so the first click can be queued on time (plus device latency). */
 const startDelayMs = () => 250 + audioEngine.totalLatency * 1000;
 
-export function GameScreen({ level, song, mode, speed, section = null, inputs, settings, virtualPiano, onFinished, onQuit }: GameScreenProps) {
+/** Built-in piano velocity for the player's part: full in Listen mode, soft as a guide. */
+const LISTEN_VELOCITY = 0.8;
+const GUIDE_VELOCITY = 0.38;
+
+export function GameScreen({ level, song, mode, speed, section = null, inputs, settings, virtualPiano, listen = false, guide = false, onFinished, onQuit }: GameScreenProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const scoreRef = useRef<HTMLSpanElement>(null);
   const comboRef = useRef<HTMLSpanElement>(null);
@@ -57,15 +66,19 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
     const host = hostRef.current;
     if (!host) return;
     const def = song.definition;
+    // In Listen mode the auto-player is the only input; the player's keys still sound but aren't scored.
     const session = new GameSession({
       song,
-      inputs,
-      engineConfig: {
-        windows: mode === 'challenge' ? CHALLENGE_WINDOWS : TIMING_PRESETS[settings.timingPreset].windows,
-        inputOffsetMs: settings.inputOffsetMs,
-        waitForNotes: mode === 'discover',
-      },
+      inputs: listen ? [] : inputs,
+      engineConfig: listen
+        ? { inputOffsetMs: 0 }
+        : {
+            windows: mode === 'challenge' ? CHALLENGE_WINDOWS : TIMING_PRESETS[settings.timingPreset].windows,
+            inputOffsetMs: settings.inputOffsetMs,
+            waitForNotes: mode === 'discover',
+          },
     });
+    const autoPlayer = listen ? new AutoPlayer(song) : null;
     sessionRef.current = session;
     // Dev-only hook for automated browser tests (stripped from production builds).
     if (import.meta.env.DEV) (window as unknown as { __pianoRush?: GameSession }).__pianoRush = session;
@@ -94,11 +107,13 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
     const offEngine = session.engine.on((e) => {
       if (e.type === 'note') renderer?.triggerNote(e.note.lane, e.judgment);
       else if (e.type === 'judgment') {
-        renderer?.showJudgment(e.judgment, e.offsetMs, e.event.partial);
-        audioEngine.playEffect(e.judgment);
+        if (!listen) {
+          renderer?.showJudgment(e.judgment, e.offsetMs, e.event.partial);
+          audioEngine.playEffect(e.judgment);
+        }
       } else if (e.type === 'hold') {
         renderer?.triggerHold(e.note.lane, e.result);
-        if (e.result === 'full') audioEngine.playEffect('hold');
+        if (e.result === 'full' && !listen) audioEngine.playEffect('hold');
       } else if (e.type === 'wrongNote') {
         renderer?.triggerWrongNote(e.lane);
         audioEngine.playEffect('wrong');
@@ -122,14 +137,21 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
       effects: settings.effectsVolume,
     });
     // A recorded backing track (licensed recording) is used for full-speed, full-song runs.
-    let backing = new BackingPlayer(audioEngine, session.engine, song, () => performance.now(), { metronome: settings.metronome });
+    // The built-in piano plays the player's part in Listen mode (and softly with the melody guide);
+    // in Discover the guide instead plays each note the song stops to wait for.
+    const backingOptions = {
+      metronome: settings.metronome,
+      melody: listen ? LISTEN_VELOCITY : guide && mode !== 'discover' ? GUIDE_VELOCITY : undefined,
+      hintOnWait: guide && mode === 'discover',
+    };
+    let backing = new BackingPlayer(audioEngine, session.engine, song, () => performance.now(), backingOptions);
     const recordingUrl = speed === 1 && !section ? def.backing?.audio?.url : undefined;
     const loadRecording = recordingUrl
       ? fetch(recordingUrl)
           .then((r) => r.arrayBuffer())
           .then((data) => audioEngine.decode(data))
           .then((buffer) => {
-            backing = new BackingPlayer(audioEngine, session.engine, song, () => performance.now(), { metronome: settings.metronome, recording: buffer });
+            backing = new BackingPlayer(audioEngine, session.engine, song, () => performance.now(), { ...backingOptions, recording: buffer });
           })
           .catch(() => undefined) // fall back to the generated band
       : Promise.resolve();
@@ -146,6 +168,7 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
     let fpsFrames = 0;
     let fpsSince = performance.now();
     const frame = () => {
+      autoPlayer?.update(session.engine, session.now());
       const snap = session.frame();
       if (DEBUG && debugRef.current) {
         fpsFrames++;
@@ -231,7 +254,7 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
       renderer?.destroy();
       sessionRef.current = null;
     };
-  }, [song, mode, speed, section, inputs, settings, virtualPiano]);
+  }, [song, mode, speed, section, inputs, settings, virtualPiano, listen, guide]);
 
   const session = sessionRef.current;
   const paused = state === 'paused';
@@ -243,7 +266,12 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
       <header className="hud" style={{ height: HUD_HEIGHT }}>
         <div className="hud-left">
           <div className="hud-title">
-            <span className={`mode-badge mode-${mode}`}>{MODE_LABEL[mode]}</span>
+            {listen ? (
+              <span className="mode-badge listen-badge">👂 Listen</span>
+            ) : (
+              <span className={`mode-badge mode-${mode}`}>{MODE_LABEL[mode]}</span>
+            )}
+            {guide && <span className="mode-badge speed-badge">🎹 Guide</span>}
             {speed < 1 && <span className="mode-badge speed-badge">{Math.round(speed * 100)}%</span>}
             {section && (
               <span className="mode-badge speed-badge">
@@ -298,7 +326,7 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
           <div className="card overlay-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
             <h2 id="pause-title">Paused</h2>
             <p className="muted small">
-              {level.title} · {MODE_LABEL[mode]}
+              {level.title} · {listen ? 'Listen' : MODE_LABEL[mode]}
             </p>
             {notice?.type === 'device-disconnected' && (
               <div className="notice warn" role="alert">

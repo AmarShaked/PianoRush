@@ -188,8 +188,16 @@ input.text {
 .guide-keyboard { width: 100%; max-height: 150px; margin-top: 8px; }
 .mk-label { font: 800 10px var(--font); fill: #1b1b2b; }
 .mk-hint { font: 700 9px var(--font); fill: #6a6a8a; }
+.mk-label-black { font-size: 7px; fill: #ffffff; }
+.mk-hint-black { font-size: 7px; fill: #c9c9e0; }
 .mk-middle-c { font: 800 9px var(--font); fill: #ff4d6d; letter-spacing: 0.08em; }
 .btn-play { font-size: 1.3rem; padding: 1rem; margin-top: auto; }
+.play-row { display: flex; gap: 8px; margin-top: auto; }
+.play-row .btn-play { flex: 1; margin-top: 0; }
+.btn-listen { font-size: 1.05rem; padding: 1rem 1.1rem; white-space: nowrap; }
+.guide-toggle { display: flex; gap: 8px; align-items: flex-start; font-size: 0.85rem; line-height: 1.35; cursor: pointer; }
+.guide-toggle input { margin-top: 2px; }
+.mode-badge.listen-badge { background: rgba(155, 93, 229, 0.35); }
 .input-panel { display: flex; flex-direction: column; gap: 8px; }
 .panel-block { padding: 12px 0; border-bottom: 1px solid var(--panel-border); }
 .keycaps { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }

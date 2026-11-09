@@ -31,6 +31,8 @@ export interface Settings {
   practiceSpeed: number;
   /** Letters on the falling tiles. */
   showNoteLabels: boolean;
+  /** The built-in piano softly plays the melody along with you (practice: no stars). */
+  melodyGuide: boolean;
   /** Finger numbers on the key strip (finger guidance). */
   showFingers: boolean;
   /** First-launch setup completed (or skipped). */
@@ -73,6 +75,7 @@ export const DEFAULT_SETTINGS: Settings = {
   practiceSpeed: 1,
   showNoteLabels: true,
   showFingers: true,
+  melodyGuide: false,
   onboarded: false,
 };
 

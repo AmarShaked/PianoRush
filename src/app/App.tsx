@@ -39,6 +39,10 @@ type Screen =
       readonly section: PracticeSection | null;
       readonly settings: Settings;
       readonly virtualPiano: boolean;
+      /** Listen mode: the game plays the song for you. */
+      readonly listen: boolean;
+      /** The built-in piano plays the melody along with the player. */
+      readonly guide: boolean;
     }
   | {
       readonly name: 'results';
@@ -46,6 +50,7 @@ type Screen =
       readonly mode: GameMode;
       readonly speed: number;
       readonly section: PracticeSection | null;
+      readonly guide: boolean;
       readonly results: GameResults;
       readonly outcome: RunOutcome;
       readonly update: ProgressUpdate;
@@ -103,7 +108,13 @@ export function App() {
   }, [gameSimEnabled]);
 
   const startLevel = useCallback(
-    (level: LevelDefinition, mode: GameMode, speed: number = settings.practiceSpeed, section: PracticeSection | null = null) => {
+    (
+      level: LevelDefinition,
+      mode: GameMode,
+      speed: number = settings.practiceSpeed,
+      section: PracticeSection | null = null,
+      { listen = false, guide = settings.melodyGuide }: { listen?: boolean; guide?: boolean } = {},
+    ) => {
       // Always called from a click: the moment browsers allow audio to start.
       audioEngine.unlock();
       // Auto: built-in piano only when nothing else makes sound (never on top of an acoustic piano).
@@ -114,20 +125,32 @@ export function App() {
       setRun((r) => r + 1);
       // Settings are frozen for the duration of a run.
       // The input offset comes from this device configuration's calibration (PRD §6.4).
-      setScreen({ name: 'game', run: run + 1, level, mode, speed, section, settings: { ...settings, inputOffsetMs: offsetFor(settings) }, virtualPiano });
+      setScreen({
+        name: 'game',
+        run: run + 1,
+        level,
+        mode,
+        speed,
+        section,
+        settings: { ...settings, inputOffsetMs: offsetFor(settings) },
+        virtualPiano,
+        listen,
+        guide: guide && !listen,
+      });
     },
     [run, settings],
   );
 
   const finish = useCallback(
-    (level: LevelDefinition, mode: GameMode, speed: number, section: PracticeSection | null, results: GameResults) => {
-      const outcome = evaluateRun(level, results, mode, speed, section !== null);
+    (level: LevelDefinition, mode: GameMode, speed: number, section: PracticeSection | null, guide: boolean, results: GameResults) => {
+      // Sections and melody-guided runs are practice: no stars, no unlocks.
+      const outcome = evaluateRun(level, results, mode, speed, section !== null || guide);
       // Free-play songs never unlock anything: merge them as a list of one.
       const list = collectionOf(level).kind === 'path' ? LEVELS : [level];
       const update = applyRun(list, progress, level.id, outcome, results.score);
       setProgress(update.progress);
       saveProgress(update.progress);
-      setScreen({ name: 'results', level, mode, speed, section, results, outcome, update });
+      setScreen({ name: 'results', level, mode, speed, section, guide, results, outcome, update });
     },
     [progress],
   );
@@ -148,7 +171,9 @@ export function App() {
           inputs={INPUTS}
           settings={screen.settings}
           virtualPiano={screen.virtualPiano}
-          onFinished={(results) => finish(screen.level, screen.mode, screen.speed, screen.section, results)}
+          listen={screen.listen}
+          guide={screen.guide}
+          onFinished={(results) => (screen.listen ? toHome() : finish(screen.level, screen.mode, screen.speed, screen.section, screen.guide, results))}
           onQuit={toHome}
         />
       );
@@ -165,10 +190,11 @@ export function App() {
           nextLevel={nextLevel}
           speed={screen.speed}
           section={screen.section}
-          onRetry={() => startLevel(screen.level, screen.mode, screen.speed, screen.section)}
+          guided={screen.guide}
+          onRetry={() => startLevel(screen.level, screen.mode, screen.speed, screen.section, { guide: screen.guide })}
           onPlayMode={(m, sp) => {
-            updateSettings({ preferredMode: m, practiceSpeed: sp });
-            startLevel(screen.level, m, sp);
+            updateSettings({ preferredMode: m, practiceSpeed: sp, melodyGuide: false });
+            startLevel(screen.level, m, sp, null, { guide: false });
           }}
           onNext={() => nextLevel && startLevel(nextLevel, screen.mode === 'discover' ? 'flow' : screen.mode, 1)}
           onMenu={() => {
@@ -254,6 +280,7 @@ export function App() {
           settings={settings}
           onSettingsChange={updateSettings}
           onPlay={() => startLevel(selected, mode)}
+          onListen={() => startLevel(selected, 'flow', settings.practiceSpeed, null, { listen: true })}
           onPracticeSection={(section) => startLevel(selected, mode, settings.practiceSpeed, section)}
           onDiagnostics={() => setScreen({ name: 'diagnostics' })}
           onCalibrate={() => setScreen({ name: 'calibration', returnTo: 'home' })}

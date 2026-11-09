@@ -183,3 +183,24 @@ describe('scheduling windows', () => {
     expect(resumed.every((n) => n.part === 'pad' || n.part === 'bass')).toBe(true);
   });
 });
+
+describe('melody guide / Listen', () => {
+  const song = compileSong(HITS.levels[0]!.song);
+
+  it('leaves the player part out by default', () => {
+    expect(arrange(song).some((n) => n.part === 'melody')).toBe(false);
+  });
+
+  it('adds every player note on the piano at the requested velocity', () => {
+    const melody = arrange(song, { melody: 0.4 }).filter((n) => n.part === 'melody');
+    expect(melody).toHaveLength(song.notes.length);
+    for (const n of song.notes) {
+      expect(melody).toContainEqual({ part: 'melody', beat: n.startBeat, durationBeats: n.durationBeats, velocity: 0.4, midi: n.midi });
+    }
+  });
+
+  it('works for songs without a backing spec', () => {
+    const bare = compileSong({ ...WORLD_1.levels[0]!.song, backing: undefined });
+    expect(arrange(bare, { melody: 0.8 }).filter((n) => n.part === 'melody')).toHaveLength(bare.notes.length);
+  });
+});

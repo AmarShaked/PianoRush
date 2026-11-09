@@ -54,6 +54,8 @@ Add `?debug` to the URL for an FPS and song-time readout during play.
   - **Discover:** the song waits for the right key.
   - **Flow:** full tempo; earns stars.
   - **Challenge:** strict timing; earns a 🏆.
+- **👂 Listen:** the game plays the whole song for you on the built-in piano while the tiles fall and the keys light up. No score is kept; it works at any practice speed.
+- **🎹 Melody guide:** the built-in piano softly plays your part along with you. In Discover it plays each note the song stops to wait for. Guided runs are practice (no stars).
 - **Practice speed:** 50% / 75% / Full. **Practice a section** loops any 4-bar phrase three times and points out repeated phrases ("Phrase A appears 4×"). Practice runs never give stars.
 - **Stars per level:** ★ for completing (≥ 50% of notes), ★★ for ≥ 80%, ★★★ for ≥ 95%. Completing a level unlocks the next, and the unlock order continues across worlds.
 
@@ -104,7 +106,7 @@ Check that your license covers this use. ACUM mainly licenses performance of the
 ## Sound
 
 - **Backing band.** Drums, bass and chords are generated from each song's chord progression and style (dance, pop, groove, waltz, gentle), with fills and crashes every 4-bar phrase.
-  - It never plays your part, and it moves out of whatever register you're playing in.
+  - It never plays your part (unless you turn on the melody guide or Listen), and it moves out of whatever register you're playing in.
   - In Chord City it plays the melody instead (you play the harmony); in two-hand songs it leaves the bass to you.
 - **Sync.** The music follows the same song timeline as the tiles and the scoring, and is scheduled ahead. Speaker latency is compensated by mapping the browser's audio clock to the game clock (re-measured continuously), so there is no drift. Pause, resume, restart and Discover waits all stop and resume cleanly.
 - **Piano sound.**
