@@ -21,6 +21,17 @@ describe('NativeMidiBridge (iOS / Android wrapper input)', () => {
     expect(posted).toEqual([{ type: 'ready', version: 1 }]);
   });
 
+  it('forwards the sustain pedal per device and lifts it when the device goes away', () => {
+    const { bridge, events } = setup();
+    const pedals: Array<[boolean, string]> = [];
+    bridge.subscribePedal((p) => pedals.push([p.down, p.deviceId]));
+    bridge.api.midi([0xb0, 64, 127], 0, 'usb-1', 'Piano');
+    bridge.api.midi([0xb0, 64, 127], 0, 'usb-1');
+    bridge.api.device('usb-1', 'Piano', false);
+    expect(pedals).toEqual([[true, 'usb-1'], [false, 'usb-1']]);
+    expect(events).toHaveLength(0);
+  });
+
   it('turns raw MIDI bytes into normalized events, back-dated by the native age', () => {
     const { bridge, events } = setup();
     bridge.api.midi([0x90, 60, 100], 12, 'usb-1', 'Yamaha P-125');

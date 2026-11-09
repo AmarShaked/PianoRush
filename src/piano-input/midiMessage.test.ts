@@ -1,8 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { parseMidiMessage } from './midiMessage';
+import { parseMidiMessage, parseSustainPedal } from './midiMessage';
 import { HeldNotesTracker } from './HeldNotesTracker';
 import { midiToNoteName, isBlackKey } from './noteNames';
 import type { PianoEvent } from './types';
+
+describe('parseSustainPedal', () => {
+  it('reads CC64 on any channel: 64–127 down, 0–63 up', () => {
+    expect(parseSustainPedal([0xb0, 64, 127], 5, 'dev')).toEqual({ type: 'sustain', down: true, time: 5, source: 'midi', deviceId: 'dev' });
+    expect(parseSustainPedal([0xb3, 64, 64], 5, 'dev')?.down).toBe(true);
+    expect(parseSustainPedal([0xb0, 64, 63], 5, 'dev')?.down).toBe(false);
+    expect(parseSustainPedal([0xb0, 64, 0], 5, 'dev', 'native-midi')).toMatchObject({ down: false, source: 'native-midi' });
+  });
+
+  it('ignores other controllers and messages', () => {
+    expect(parseSustainPedal([0xb0, 67, 127], 0, 'dev')).toBeNull(); // soft pedal
+    expect(parseSustainPedal([0xb0, 1, 127], 0, 'dev')).toBeNull(); // mod wheel
+    expect(parseSustainPedal([0x90, 64, 127], 0, 'dev')).toBeNull(); // note E4
+    expect(parseSustainPedal([0xb0, 64], 0, 'dev')).toBeNull();
+    expect(parseSustainPedal(null, 0, 'dev')).toBeNull();
+  });
+});
 
 describe('parseMidiMessage', () => {
   it('parses Note On', () => {

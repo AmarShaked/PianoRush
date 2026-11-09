@@ -1,7 +1,7 @@
 import { Emitter } from './Emitter';
 import { HeldNotesTracker } from './HeldNotesTracker';
-import { parseMidiMessage } from './midiMessage';
-import type { InputStatusEvent, InputStatusListener, PianoEvent, PianoEventListener, PianoInputSource, Unsubscribe } from './types';
+import { parseMidiMessage, parseSustainPedal } from './midiMessage';
+import type { InputStatusEvent, InputStatusListener, PedalEvent, PedalListener, PianoEvent, PianoEventListener, PianoInputSource, Unsubscribe } from './types';
 
 /**
  * Bridge for native app wrappers (PRD §13: "iOS MIDI support must not rely on
@@ -31,6 +31,9 @@ export class NativeMidiBridge implements PianoInputSource {
   private readonly tracker = new HeldNotesTracker();
   private readonly events = new Emitter<PianoEvent>();
   private readonly statusEvents = new Emitter<InputStatusEvent>();
+  private readonly pedalEvents = new Emitter<PedalEvent>();
+  /** Devices whose sustain pedal is down. */
+  private readonly pedalsDown = new Set<string>();
   private readonly changes = new Emitter<void>();
   private readonly devices = new Map<string, string>();
   private _active = false;
@@ -52,6 +55,8 @@ export class NativeMidiBridge implements PianoInputSource {
     midi: (bytes, ageMs = 0, deviceId = 'native', deviceName) => {
       this.markActive(deviceId, deviceName ?? this.devices.get(deviceId) ?? 'Native MIDI');
       const time = this.now() - Math.max(0, Math.min(1000, ageMs));
+      const pedal = parseSustainPedal(bytes, time, deviceId, 'native-midi');
+      if (pedal) return this.setPedal(pedal);
       const event = parseMidiMessage(bytes, time, deviceId, 'native-midi');
       if (!event) return;
       const accepted = this.tracker.process(event);
@@ -64,6 +69,7 @@ export class NativeMidiBridge implements PianoInputSource {
       } else {
         this.devices.delete(deviceId);
         for (const release of this.tracker.releaseAll(this.now())) if (release.deviceId === deviceId) this.events.emit(release);
+        this.setPedal({ type: 'sustain', down: false, time: this.now(), source: 'native-midi', deviceId });
         this.statusEvents.emit({ type: 'disconnected', deviceId, deviceName, time: this.now() });
         this.changes.emit();
       }
@@ -83,8 +89,18 @@ export class NativeMidiBridge implements PianoInputSource {
   subscribeStatus(listener: InputStatusListener): Unsubscribe {
     return this.statusEvents.on(listener);
   }
+  subscribePedal(listener: PedalListener): Unsubscribe {
+    return this.pedalEvents.on(listener);
+  }
   onChange(listener: () => void): Unsubscribe {
     return this.changes.on(listener);
+  }
+
+  private setPedal(pedal: PedalEvent): void {
+    if (pedal.down === this.pedalsDown.has(pedal.deviceId)) return;
+    if (pedal.down) this.pedalsDown.add(pedal.deviceId);
+    else this.pedalsDown.delete(pedal.deviceId);
+    this.pedalEvents.emit(pedal);
   }
 
   private markActive(deviceId: string, deviceName: string): void {

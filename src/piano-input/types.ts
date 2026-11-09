@@ -33,6 +33,21 @@ export interface PianoEvent {
 export type PianoEventListener = (event: PianoEvent) => void;
 export type Unsubscribe = () => void;
 
+/**
+ * Sustain (damper) pedal, MIDI CC64. Kept out of `PianoEvent` on purpose:
+ * the pedal only changes how the built-in piano sounds; it is never scored.
+ */
+export interface PedalEvent {
+  readonly type: 'sustain';
+  readonly down: boolean;
+  /** Same time base as PianoEvent.time. */
+  readonly time: number;
+  readonly source: InputSourceKind;
+  readonly deviceId: string;
+}
+
+export type PedalListener = (event: PedalEvent) => void;
+
 export interface InputStatusEvent {
   readonly type: 'connected' | 'disconnected';
   readonly deviceId: string;
@@ -52,4 +67,6 @@ export interface PianoInputSource {
   subscribe(listener: PianoEventListener): Unsubscribe;
   /** Optional device status notifications (connect / disconnect). */
   subscribeStatus?(listener: InputStatusListener): Unsubscribe;
+  /** Optional sustain-pedal stream (MIDI CC64, or Space on the computer keyboard). */
+  subscribePedal?(listener: PedalListener): Unsubscribe;
 }

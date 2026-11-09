@@ -1,6 +1,7 @@
 import type { BackingNote } from './arranger';
 import { ClockSync } from './ClockSync';
 import { SampledPiano } from './SampledPiano';
+import { PianoKeys } from './sustain';
 import { bass, clap, click, crash, effect, hat, keys, kick, lead, openHat, pad, piano, snare, synthBass, type EffectKind, type Voice } from './synth';
 
 export interface Volumes {
@@ -42,7 +43,8 @@ export class AudioEngine {
   private readonly sync = new ClockSync();
   private syncTimer: ReturnType<typeof setInterval> | null = null;
   private readonly backingVoices = new Set<Voice>();
-  private readonly pianoVoices = new Map<number, Voice>();
+  /** The built-in piano's sounding notes, held keys and sustain pedal. */
+  private readonly pianoKeys = new PianoKeys<Voice>();
   private volumes: Volumes = { backing: 0.8, piano: 0.9, metronome: 0.6, effects: 0.35 };
   /** Count of notes scheduled since creation (diagnostics / tests). */
   scheduledCount = 0;
@@ -262,20 +264,29 @@ export class AudioEngine {
   pianoNoteOn(midi: number, velocity: number): void {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return;
-    this.pianoVoices.get(midi)?.stop(ctx.currentTime, 0.03);
-    this.pianoVoices.set(midi, this.pianoVoice(ctx, this.buses.piano, ctx.currentTime, midi, velocity));
+    const previous = this.pianoKeys.noteOn(midi, this.pianoVoice(ctx, this.buses.piano, ctx.currentTime, midi, velocity));
+    previous?.stop(ctx.currentTime, 0.05); // the hammer strikes the same string again
   }
 
   pianoNoteOff(midi: number): void {
-    const ctx = this.ctx;
-    const v = this.pianoVoices.get(midi);
-    if (!ctx || !v) return;
-    v.stop(ctx.currentTime, 0.18);
-    this.pianoVoices.delete(midi);
+    const v = this.pianoKeys.noteOff(midi);
+    if (this.ctx && v) v.stop(this.ctx.currentTime, 0.18);
+  }
+
+  /** Sustain pedal for the built-in piano: released keys keep ringing until it lifts. */
+  pianoSustain(down: boolean): void {
+    const released = this.pianoKeys.setPedal(down);
+    // Lifting the pedal drops all the dampers at once: a slightly softer release than one key.
+    if (this.ctx) for (const v of released) v.stop(this.ctx.currentTime, 0.25);
+  }
+
+  get pianoPedalDown(): boolean {
+    return this.pianoKeys.pedalDown;
   }
 
   pianoAllOff(): void {
-    for (const midi of [...this.pianoVoices.keys()]) this.pianoNoteOff(midi);
+    const ctx = this.ctx;
+    for (const v of this.pianoKeys.clear()) if (ctx) v.stop(ctx.currentTime, 0.18);
   }
 
   /** Current output level (RMS, 0..1) — for diagnostics and automated checks. */
@@ -294,7 +305,7 @@ export class AudioEngine {
     void this.ctx?.close().catch(() => undefined);
     this.ctx = null;
     this.backingVoices.clear();
-    this.pianoVoices.clear();
+    this.pianoKeys.clear();
   }
 
   setPianoSound(sound: PianoSound): void {

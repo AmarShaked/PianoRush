@@ -317,6 +317,7 @@ kbd {
 .diag-list.big dd { font-size: 1.15rem; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; margin-bottom: 10px; }
 .chip { background: rgba(76, 201, 240, 0.18); border: 1px solid rgba(76, 201, 240, 0.5); padding: 3px 10px; border-radius: 999px; font-weight: 700; }
+.chip-on { background: rgba(6, 214, 160, 0.25); border-color: rgba(6, 214, 160, 0.7); }
 .diag-keyboard { width: 100%; max-height: 120px; }
 .status-log { padding-left: 1rem; }
 .event-log { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.9rem; }

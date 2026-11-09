@@ -26,6 +26,24 @@ describe('KeyboardSimulator', () => {
     });
   });
 
+  it('holds the sustain pedal with Space, without producing a note', () => {
+    const pedals: boolean[] = [];
+    sim.subscribePedal((p) => pedals.push(p.down));
+    target.key('keydown', 'Space', 400);
+    target.key('keydown', 'Space', 430, { repeat: true });
+    target.key('keyup', 'Space', 600);
+    expect(pedals).toEqual([true, false]);
+    expect(events).toHaveLength(0);
+  });
+
+  it('lifts the pedal when disabled', () => {
+    const pedals: boolean[] = [];
+    sim.subscribePedal((p) => pedals.push(p.down));
+    target.key('keydown', 'Space', 400);
+    sim.disable();
+    expect(pedals).toEqual([true, false]);
+  });
+
   it('suppresses auto-repeat keydowns and tracks held keys', () => {
     target.key('keydown', 'KeyD', 400);
     target.key('keydown', 'KeyD', 430, { repeat: true });

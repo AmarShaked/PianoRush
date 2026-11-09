@@ -66,6 +66,7 @@ Add `?debug` to the URL for an FPS and song-time readout during play.
 | Home row | `A S D F G H J K L ; '` | C4 D4 E4 F4 G4 A4 B4 C5 D5 E5 F5 |
 | Row above | `W E · T Y U · O P` | C#4 D#4 · F#4 G#4 A#4 · C#5 D#5 |
 | Bottom row (left hand) | `Z X C V B N M` | C3 D3 E3 F3 G3 A3 B3 |
+| Space (hold) | `Space` | Sustain pedal |
 
 ## Worlds
 
@@ -114,6 +115,7 @@ Check that your license covers this use. ACUM mainly licenses performance of the
   - **Built-in piano:** velocity-sensitive. Choose it in Settings → Sound:
     - **Grand piano (sampled)**, the default: a Yamaha C5 grand recorded as [Salamander Grand Piano V3](https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html) by Alexander Holm (CC BY 3.0). It has every minor third from A0 to C8 at 4 loudness layers, about 6 MB. It downloads the first time the built-in piano plays and then works offline. Until it arrives, and if the download fails, the synth plays instead.
     - **Light synth piano:** no download.
+  - **Sustain pedal:** a MIDI sustain pedal (CC64), or holding Space on the computer keyboard, keeps the built-in piano's notes ringing after you let go of the keys, like a real damper pedal. It only changes the sound. Scoring still follows your keys, so long notes must still be held down with your finger. With a piano that makes its own sound, the pedal works on your piano as usual.
   - **Auto:** built-in only when nothing else makes sound.
 - **Volumes.** Backing, built-in piano, clicks and **sound effects** each have a slider. There are 4 count-in clicks, plus an optional metronome.
 - **Calibration** (Settings → Timing & display):

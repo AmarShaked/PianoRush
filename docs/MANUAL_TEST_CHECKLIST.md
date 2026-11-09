@@ -145,3 +145,11 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] Repeated fast notes (trills) don't click, and releasing a key damps the note quickly
 - [ ] After one use, the grand piano still plays with the network off
 - [ ] Switching to "Light synth piano" plays the synth immediately
+
+## Sustain pedal (built-in piano)
+- [ ] With a MIDI piano on "Built-in piano sound", pressing the sustain pedal keeps released notes ringing, and lifting it damps them. MIDI diagnostics shows the pedal as down / up
+- [ ] Half-pedalling or a continuous pedal doesn't flicker the sound on and off
+- [ ] Re-striking a key with the pedal down re-plays that note cleanly (no doubled or stuck note)
+- [ ] Holding Space with the keyboard simulator acts as the pedal and doesn't press buttons or scroll
+- [ ] Unplugging the piano while the pedal is down doesn't leave notes ringing
+- [ ] Hold tiles still need the key held down, even with the pedal on

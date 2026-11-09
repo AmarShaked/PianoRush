@@ -27,6 +27,7 @@ const MAX_LOG = 40;
 export function DiagnosticsScreen({ midi, keyboardSimulatorEnabled, onKeyboardSimulatorChange, lanes, onBack }: DiagnosticsScreenProps) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [held, setHeld] = useState<number[]>([]);
+  const [pedal, setPedal] = useState<boolean | null>(null);
   const [statusLog, setStatusLog] = useState<string[]>([]);
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export function DiagnosticsScreen({ midi, keyboardSimulatorEnabled, onKeyboardSi
       refreshHeld();
     });
     const offMic = microphoneInput.subscribe((e) => push(e, true));
+    const offPedals = [midiManager, keyboardSimulator].map((input) => input.subscribePedal((p) => setPedal(p.down)));
     const offStatus = midiManager.subscribeStatus((s) =>
       setStatusLog((prev) => [`${new Date().toLocaleTimeString()} — ${s.deviceName} ${s.type}`, ...prev].slice(0, 8)),
     );
@@ -63,6 +65,7 @@ export function DiagnosticsScreen({ midi, keyboardSimulatorEnabled, onKeyboardSi
       offMidi();
       offKeys();
       offMic();
+      offPedals.forEach((off) => off());
       offStatus();
       keyboardSimulator.disable();
     };
@@ -126,6 +129,14 @@ export function DiagnosticsScreen({ midi, keyboardSimulatorEnabled, onKeyboardSi
             <p className="muted">Press a key on your piano (or A S D F G)…</p>
           )}
 
+          <h3>Sustain pedal</h3>
+          <p>
+            {pedal === null ? (
+              <span className="muted">not pressed yet (MIDI CC64, or hold Space on the computer keyboard)</span>
+            ) : (
+              <span className={`chip${pedal ? ' chip-on' : ''}`}>{pedal ? 'down' : 'up'}</span>
+            )}
+          </p>
           <h3>Held notes</h3>
           <div className="chips">
             {held.length ? held.map((n) => <span key={n} className="chip">{midiToNoteName(n)} · {n}</span>) : <span className="muted">none</span>}

@@ -1,7 +1,9 @@
-import type { InputSourceKind, PianoEvent } from './types';
+import type { InputSourceKind, PedalEvent, PianoEvent } from './types';
 
 const NOTE_OFF = 0x80;
 const NOTE_ON = 0x90;
+const CONTROL_CHANGE = 0xb0;
+const SUSTAIN_PEDAL = 64;
 
 /**
  * Parse one raw MIDI message into a normalized PianoEvent.
@@ -43,4 +45,22 @@ export function parseMidiMessage(
     return { type: 'noteOff', note, velocity, time, channel, source, deviceId };
   }
   return null;
+}
+
+/**
+ * Parse a sustain-pedal message (Control Change 64). Values 64–127 mean down,
+ * 0–63 up (continuous / half-pedal controllers are treated as on or off).
+ * Anything else → null.
+ */
+export function parseSustainPedal(
+  data: ArrayLike<number> | null | undefined,
+  time: number,
+  deviceId: string,
+  source: InputSourceKind = 'midi',
+): PedalEvent | null {
+  if (!data || data.length < 3) return null;
+  const status = data[0] ?? 0;
+  const value = data[2] ?? -1;
+  if ((status & 0xf0) !== CONTROL_CHANGE || status > 0xbf || data[1] !== SUSTAIN_PEDAL || value < 0 || value > 127) return null;
+  return { type: 'sustain', down: value >= 64, time, source, deviceId };
 }

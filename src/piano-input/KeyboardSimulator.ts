@@ -1,6 +1,9 @@
 import { Emitter } from './Emitter';
 import { HeldNotesTracker } from './HeldNotesTracker';
-import type { PianoEvent, PianoEventListener, PianoInputSource, Unsubscribe } from './types';
+import type { PedalEvent, PedalListener, PianoEvent, PianoEventListener, PianoInputSource, Unsubscribe } from './types';
+
+/** Hold Space for the sustain pedal. */
+export const PEDAL_KEY = 'Space';
 
 /**
  * Default computer-keyboard mapping (KeyboardEvent.code → MIDI note), in the
@@ -75,6 +78,8 @@ export class KeyboardSimulator implements PianoInputSource {
   private readonly velocity: number;
   private readonly tracker = new HeldNotesTracker({ duplicateWindowMs: Number.POSITIVE_INFINITY });
   private readonly events = new Emitter<PianoEvent>();
+  private readonly pedalEvents = new Emitter<PedalEvent>();
+  private pedalDown = false;
   private enabled = false;
 
   constructor(options: KeyboardSimulatorOptions = {}) {
@@ -109,6 +114,10 @@ export class KeyboardSimulator implements PianoInputSource {
     return this.events.on(listener);
   }
 
+  subscribePedal(listener: PedalListener): Unsubscribe {
+    return this.pedalEvents.on(listener);
+  }
+
   heldNotes(): number[] {
     return this.tracker.heldNotes();
   }
@@ -128,7 +137,18 @@ export class KeyboardSimulator implements PianoInputSource {
     return Number.isFinite(ts) && ts > 0 && Math.abs(now - ts) < 1000 ? ts : now;
   }
 
+  private setPedal(down: boolean, time: number): void {
+    if (down === this.pedalDown) return;
+    this.pedalDown = down;
+    this.pedalEvents.emit({ type: 'sustain', down, time, source: 'keyboard', deviceId: KeyboardSimulator.DEVICE_ID });
+  }
+
   private readonly handleKeyDown = (e: KeyboardEventLike): void => {
+    if (e.code === PEDAL_KEY && !e.ctrlKey && !e.metaKey && !e.altKey && !isEditableTarget(e.target)) {
+      e.preventDefault(); // no page scroll / button press
+      if (!e.repeat) this.setPedal(true, this.eventTime(e));
+      return;
+    }
     const note = this.keyMap[e.code];
     if (note === undefined || e.ctrlKey || e.metaKey || e.altKey || isEditableTarget(e.target)) return;
     e.preventDefault();
@@ -146,6 +166,7 @@ export class KeyboardSimulator implements PianoInputSource {
   };
 
   private readonly handleKeyUp = (e: KeyboardEventLike): void => {
+    if (e.code === PEDAL_KEY) return this.setPedal(false, this.eventTime(e));
     const note = this.keyMap[e.code];
     if (note === undefined) return;
     const accepted = this.tracker.process({
@@ -166,5 +187,6 @@ export class KeyboardSimulator implements PianoInputSource {
 
   private releaseAll(): void {
     for (const release of this.tracker.releaseAll(this.now())) this.events.emit(release);
+    this.setPedal(false, this.now());
   }
 }

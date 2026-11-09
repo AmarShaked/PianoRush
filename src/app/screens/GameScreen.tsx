@@ -158,10 +158,12 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
           })
           .catch(() => undefined) // fall back to the generated band
       : Promise.resolve();
+    // The sustain pedal only colours the built-in piano's sound; scoring (including holds) follows the keys.
     const offPiano = virtualPiano
-      ? inputs.map((input) =>
+      ? inputs.flatMap((input) => [
           input.subscribe((e) => (e.type === 'noteOn' ? audioEngine.pianoNoteOn(e.note, e.velocity) : audioEngine.pianoNoteOff(e.note))),
-        )
+          input.subscribePedal?.((p) => audioEngine.pianoSustain(p.down)) ?? (() => undefined),
+        ])
       : [];
 
     // HUD is updated directly (no React re-render per frame).

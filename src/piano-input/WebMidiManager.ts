@@ -1,9 +1,11 @@
 import { Emitter } from './Emitter';
 import { HeldNotesTracker } from './HeldNotesTracker';
-import { parseMidiMessage } from './midiMessage';
+import { parseMidiMessage, parseSustainPedal } from './midiMessage';
 import type {
   InputStatusEvent,
   InputStatusListener,
+  PedalEvent,
+  PedalListener,
   PianoEvent,
   PianoEventListener,
   PianoInputSource,
@@ -93,6 +95,8 @@ export class WebMidiManager implements PianoInputSource {
   private readonly events = new Emitter<PianoEvent>();
   private readonly rawEvents = new Emitter<PianoEvent>();
   private readonly statusEvents = new Emitter<InputStatusEvent>();
+  private readonly pedalEvents = new Emitter<PedalEvent>();
+  private pedalDown = false;
   private readonly changes = new Emitter<void>();
   private disposed = false;
 
@@ -189,6 +193,15 @@ export class WebMidiManager implements PianoInputSource {
     return this.rawEvents.on(listener);
   }
 
+  subscribePedal(listener: PedalListener): Unsubscribe {
+    return this.pedalEvents.on(listener);
+  }
+
+  /** Whether the attached device's sustain pedal is down. */
+  get isPedalDown(): boolean {
+    return this.pedalDown;
+  }
+
   subscribeStatus(listener: InputStatusListener): Unsubscribe {
     return this.statusEvents.on(listener);
   }
@@ -227,18 +240,28 @@ export class WebMidiManager implements PianoInputSource {
     }
     if (releaseHeld) {
       for (const release of this.tracker.releaseAll(this.now())) this.events.emit(release);
+      if (this.pedalDown) this.emitPedal({ type: 'sustain', down: false, time: this.now(), source: 'midi', deviceId: this.selectedId ?? 'midi' });
     }
   }
 
   private readonly handleMessage = (e: MidiMessageEventLike): void => {
     if (!this.attachedInput) return;
     const now = this.now();
-    const event = parseMidiMessage(e.data, normalizeTimestamp(e.timeStamp, now), this.attachedInput.id);
+    const time = normalizeTimestamp(e.timeStamp, now);
+    const pedal = parseSustainPedal(e.data, time, this.attachedInput.id);
+    if (pedal) return this.emitPedal(pedal);
+    const event = parseMidiMessage(e.data, time, this.attachedInput.id);
     if (!event) return;
     this.rawEvents.emit(event);
     const accepted = this.tracker.process(event);
     if (accepted) this.events.emit(accepted);
   };
+
+  private emitPedal(pedal: PedalEvent): void {
+    if (pedal.down === this.pedalDown) return; // continuous pedals send many values
+    this.pedalDown = pedal.down;
+    this.pedalEvents.emit(pedal);
+  }
 
   private readonly handleStateChange = (e: MidiConnectionEventLike): void => {
     const port = e.port;

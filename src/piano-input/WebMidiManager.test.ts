@@ -79,6 +79,21 @@ describe('WebMidiManager', () => {
     ]);
   });
 
+  it('reports the sustain pedal on its own stream (once per change) and lifts it on disconnect', () => {
+    const pedals: boolean[] = [];
+    manager.subscribePedal((p) => pedals.push(p.down));
+    manager.selectInput('piano-1');
+    piano.send([0xb0, 64, 127], 1000);
+    piano.send([0xb0, 64, 100], 1001); // continuous pedal: still down
+    piano.send([0xb0, 64, 0], 1002);
+    piano.send([0xb0, 64, 127], 1003);
+    expect(pedals).toEqual([true, false, true]);
+    expect(manager.isPedalDown).toBe(true);
+    expect(events).toHaveLength(0); // never a note
+    manager.selectInput('pad-1');
+    expect(pedals).toEqual([true, false, true, false]);
+  });
+
   it('filters duplicate noteOns and orphan noteOffs', () => {
     manager.selectInput('piano-1');
     piano.send([0x80, 64, 0], 999);

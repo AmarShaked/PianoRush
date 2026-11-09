@@ -139,7 +139,7 @@ export function InputPanel({ midi, mic, keyboardSimulator, onKeyboardSimulatorCh
           ))}
         </div>
         <p className="small muted keymap-more">
-          More: <b>J K L ; '</b> = B4–F5 · black keys on <b>W E T Y U O P</b> · left hand <b>Z X C V B N M</b> = C3–B3
+          More: <b>J K L ; '</b> = B4–F5 · black keys on <b>W E T Y U O P</b> · left hand <b>Z X C V B N M</b> = C3–B3 · hold <b>Space</b> for the sustain pedal
         </p>
       </section>
     </div>
