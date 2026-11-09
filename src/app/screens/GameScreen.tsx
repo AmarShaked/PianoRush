@@ -11,6 +11,7 @@ import { AutoPlayer } from '../../game-engine/AutoPlayer';
 import { GameSession, type SessionNotice } from '../GameSession';
 import type { PracticeSection } from '../catalog';
 import { audioEngine } from '../inputs';
+import { useSampledPiano } from '../components/PianoSoundPicker';
 import { CHALLENGE_WINDOWS, TIMING_PRESETS, type Settings } from '../storage';
 
 export const MODE_LABEL: Record<GameMode, string> = { discover: 'Discover', flow: 'Flow', challenge: 'Challenge' };
@@ -57,6 +58,8 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
   const [state, setState] = useState<GameState>('ready');
   const [notice, setNotice] = useState<SessionNotice | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingPiano, setLoadingPiano] = useState(false);
+  const sampled = useSampledPiano();
 
   // Keep the latest callbacks without re-running the setup effect.
   const onFinishedRef = useRef(onFinished);
@@ -190,8 +193,15 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
       return snap;
     };
 
+    // When the built-in piano will be heard, give the grand piano samples a moment to arrive
+    // (first use only; then they come from the offline cache). The synth covers any stragglers.
+    const builtInHeard = virtualPiano || listen || guide;
+    const pianoReady = builtInHeard && audioEngine.sampledPiano.status !== 'ready' && settings.pianoSound === 'grand';
+    if (pianoReady) setLoadingPiano(true);
+    const loadPiano = pianoReady ? audioEngine.preparePiano().finally(() => !cancelled && setLoadingPiano(false)) : Promise.resolve();
+
     // PixiJS is loaded on demand so the menus open instantly.
-    loadRecording
+    Promise.all([loadRecording, loadPiano])
       .then(() => import('../../game-renderer/GameRenderer'))
       .then(({ GameRenderer }) =>
         GameRenderer.create(host, {
@@ -307,6 +317,11 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
         </div>
       </header>
       {DEBUG && <div className="debug-readout" ref={debugRef} />}
+      {loadingPiano && (
+        <div className="loading-note" role="status">
+          Loading the grand piano… {Math.round(sampled.progress * 100)}%
+        </div>
+      )}
 
       {error && (
         <div className="overlay">

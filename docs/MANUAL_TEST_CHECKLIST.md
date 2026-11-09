@@ -137,3 +137,11 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] **🎹 Melody guide** in Flow: the guide is clearly softer than your own playing, sits in time with the band, and the results say "melody guide" with no stars
 - [ ] Melody guide in Discover: when the song stops to wait, the waited-for note sounds once, softly
 - [ ] On the level details, black-key lanes (e.g. Dance Monkey's F♯, G♯, C♯) are coloured on the mini keyboard
+
+## Grand piano (sampled)
+- [ ] Settings → Sound → **▶ Try it** plays a grand piano chord. The note under it says "Downloading…", then "Grand piano ready"
+- [ ] Soft and hard key presses on a MIDI keyboard sound different in tone (brighter when harder) as well as loudness, with no jumps between neighbouring velocities
+- [ ] Neighbouring keys across the whole range sound even in level and in tune
+- [ ] Repeated fast notes (trills) don't click, and releasing a key damps the note quickly
+- [ ] After one use, the grand piano still plays with the network off
+- [ ] Switching to "Light synth piano" plays the synth immediately

@@ -7,9 +7,17 @@
  *  - Hashed assets: cache-first (they never change), matched ignoring Vary.
  *  - Page navigations: network-first so updates arrive when online, falling
  *    back to the cached app shell when offline.
+ *  - Piano samples (samples/…, several MB) are NOT pre-cached: they are only
+ *    downloaded when the sampled piano is used, then kept in their own cache
+ *    that survives app updates (the files never change; a new sample set gets
+ *    a new SAMPLE_CACHE name).
  * The cache name is derived from the file list, so a new build replaces the
  * old cache on activation.
  */
+
+/** Large optional downloads, cached on first use instead of on install. */
+export const isLazyAsset = (path: string) => path.startsWith('samples/');
+export const SAMPLE_CACHE = 'pr-samples-v1';
 export function cacheVersion(files: readonly string[]): string {
   let h = 2166136261;
   for (const ch of [...files].sort().join('|')) {
@@ -20,10 +28,11 @@ export function cacheVersion(files: readonly string[]): string {
 }
 
 export function buildServiceWorker(files: readonly string[]): string {
-  const precache = ['./', 'index.html', ...files.filter((f) => f !== 'index.html' && f !== 'sw.js')];
+  const precache = ['./', 'index.html', ...files.filter((f) => f !== 'index.html' && f !== 'sw.js' && !isLazyAsset(f))];
   return `/* Piano Rush service worker — generated at build time. */
 const CACHE = 'piano-rush-${cacheVersion(precache)}';
 const PRECACHE = ${JSON.stringify(precache)};
+const SAMPLES = '${SAMPLE_CACHE}';
 const url = (path) => new URL(path, self.registration.scope).href;
 
 self.addEventListener('install', (event) => {
@@ -33,7 +42,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('piano-rush-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => (k.startsWith('piano-rush-') && k !== CACHE) || (k.startsWith('pr-samples-') && k !== SAMPLES)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -50,6 +59,16 @@ self.addEventListener('fetch', (event) => {
           return res;
         })
         .catch(() => caches.match(url('index.html'), { ignoreVary: true })),
+    );
+    return;
+  }
+  if (req.url.startsWith(url('samples/'))) {
+    // Piano samples: cache-first in their own long-lived cache.
+    event.respondWith(
+      caches.open(SAMPLES).then((cache) => cache.match(req, { ignoreVary: true }).then((hit) => hit || fetch(req).then((res) => {
+        if (res.ok) cache.put(req, res.clone());
+        return res;
+      }))),
     );
     return;
   }

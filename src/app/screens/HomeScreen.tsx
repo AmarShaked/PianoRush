@@ -7,6 +7,7 @@ import { GAME_MODES, type GameMode, type LevelDefinition, type WorldDefinition }
 import { PRACTICE_SPEEDS, totalStars, type ProgressMap } from '../../game-engine/progression';
 import { InputPanel } from '../components/InputPanel';
 import { MiniKeyboard } from '../components/MiniKeyboard';
+import { PianoSoundPicker } from '../components/PianoSoundPicker';
 import { Stars } from '../components/Stars';
 import { TIMING_PRESETS, type PianoOutput, type Settings, type TimingPreset, type VisualEffects } from '../storage';
 import { describeConfig } from '../calibrationKeys';
@@ -295,8 +296,9 @@ export function HomeScreen(props: HomeScreenProps) {
                 <option value="physical">My piano makes the sound</option>
                 <option value="virtual">Built-in piano sound</option>
               </select>
-              <small className="muted">The backing track never plays your melody, so nothing is doubled.</small>
+              <small className="muted">The backing track never plays your melody (unless the melody guide or Listen is on), so nothing is doubled.</small>
             </label>
+            <PianoSoundPicker value={settings.pianoSound} onChange={(pianoSound) => onSettingsChange({ pianoSound })} />
             <Slider label="Backing track" value={settings.backingVolume} onChange={(v) => onSettingsChange({ backingVolume: v })} />
             <Slider label="Built-in piano" value={settings.pianoVolume} onChange={(v) => onSettingsChange({ pianoVolume: v })} />
             <Slider label="Clicks" value={settings.metronomeVolume} onChange={(v) => onSettingsChange({ metronomeVolume: v })} />

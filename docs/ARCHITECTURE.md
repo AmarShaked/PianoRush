@@ -167,10 +167,12 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
 
 | Piece | Role | Tested |
 | ----- | ---- | ------ |
-| `arranger.ts` | Pure: `CompiledSong` + `backing` spec → `BackingNote[]` (drums, bass, pads/keys, clicks) per style (gentle / straight / groove / pop / dance; the energetic styles add phrase crashes and snare-roll fills). Includes the count-in clicks and an optional metronome. Never includes the melody; pitched parts stay ≤ B3. | Unit tests: determinism, patterns, register, ending, bass coverage per level |
+| `arranger.ts` | Pure: `CompiledSong` + `backing` spec → `BackingNote[]` (drums, bass, pads/keys, clicks) per style (gentle / straight / groove / pop / dance; the energetic styles add phrase crashes and snare-roll fills). Includes the count-in clicks and an optional metronome. The band never plays the player's part and stays out of their register; the player's part is added (as `melody`, on the piano bus) only for the melody guide and Listen. | Unit tests: determinism, patterns, register, ending, bass coverage per level |
 | `schedule.ts` | Pure: `notesInWindow` (consecutive windows never repeat or skip a note); `notesSoundingAt` (re-enter held harmony after a resume) | Unit tests |
 | `ClockSync.ts` | Gameplay ms ↔ audio-context s, using a sliding median of output-timestamp offsets | Unit tests: outliers, drift, device change, fallback |
 | `calibration.ts` | Tap analysis: nearest-click matching, median offset, consistency, reliability, suggested offset; high-latency check | Unit tests |
+| `sampler.ts` | Note → sample mapping for the sampled grand: nearest minor-third sample (re-pitched ≤ ±1 semitone), velocity layer, in-layer gain, attack-onset detection (decoders pad MP3s differently) | Unit tests: every key, continuous loudness, onset |
+| `SampledPiano.ts` | Downloads the Salamander samples on first use (most-used layer first, 6 at a time), falls back per note to a neighbouring layer and to the synth piano | Unit tests with a fake context; prod build: lazy download, offline cache |
 | `synth.ts` | Instruments built from oscillators, filters and noise (kick, snare, hat, bass, pad, keys, click, piano). Work on any `BaseAudioContext`. | Offline render in Chromium: onsets within 0.1 ms |
 | `AudioEngine.ts` | The `AudioContext`, buses (backing / piano / metronome → master → limiter), unlock-on-gesture, precise `playBacking`, `sustainChord`, built-in piano note on/off, latency info | Headless Chromium checks |
 | `BackingPlayer.ts` | Glue between the engine and the audio. A 25 ms timer queues notes about 120 ms ahead (plus device latency) at exact context times. | Headless Chromium: beat period exact, jitter < 0.1 ms |

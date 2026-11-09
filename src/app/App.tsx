@@ -77,6 +77,8 @@ export function App() {
     });
   }, []);
 
+  useEffect(() => audioEngine.setPianoSound(settings.pianoSound), [settings.pianoSound]);
+
   const midi = useMidi(midiManager, settings.lastMidiDeviceId);
   const mic = useMic();
   // "My Songs": imported licensed songs from this browser's library.

@@ -1,5 +1,6 @@
 import type { BackingNote } from './arranger';
 import { ClockSync } from './ClockSync';
+import { SampledPiano } from './SampledPiano';
 import { bass, clap, click, crash, effect, hat, keys, kick, lead, openHat, pad, piano, snare, synthBass, type EffectKind, type Voice } from './synth';
 
 export interface Volumes {
@@ -17,6 +18,9 @@ export interface LatencyInfo {
   /** Device-reported output latency (s), or null if the browser doesn't report it. */
   readonly output: number | null;
 }
+
+/** The built-in piano's sound: the sampled grand (downloaded on first use) or the light synth. */
+export type PianoSound = 'grand' | 'synth';
 
 type AudioContextCtor = new (options?: AudioContextOptions) => AudioContext;
 
@@ -42,6 +46,9 @@ export class AudioEngine {
   private volumes: Volumes = { backing: 0.8, piano: 0.9, metronome: 0.6, effects: 0.35 };
   /** Count of notes scheduled since creation (diagnostics / tests). */
   scheduledCount = 0;
+  /** Salamander grand piano samples (falls back to the synth piano until they are in). */
+  readonly sampledPiano = new SampledPiano();
+  private pianoSound: PianoSound = 'grand';
 
   static get isSupported(): boolean {
     return audioContextCtor() !== null;
@@ -167,7 +174,7 @@ export class AudioEngine {
         break;
       case 'melody': {
         // The built-in piano playing the player's part (melody guide / Listen); released at the note's end.
-        voice = piano(ctx, out, t, note.midi ?? 60, Math.round(v * 127));
+        voice = this.pianoVoice(ctx, out, t, note.midi ?? 60, Math.round(v * 127));
         voice.stop(t + durationSec, 0.15);
         break;
       }
@@ -232,7 +239,7 @@ export class AudioEngine {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return () => undefined;
     const t = ctx.currentTime + 0.02;
-    const voices = midis.map((m) => piano(ctx, this.buses.piano, t, m, Math.round(velocity * 127)));
+    const voices = midis.map((m) => this.pianoVoice(ctx, this.buses.piano, t, m, Math.round(velocity * 127)));
     voices.forEach((v) => this.track(v));
     return () => voices.forEach((v) => v.stop(ctx.currentTime, 0.12));
   }
@@ -256,7 +263,7 @@ export class AudioEngine {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return;
     this.pianoVoices.get(midi)?.stop(ctx.currentTime, 0.03);
-    this.pianoVoices.set(midi, piano(ctx, this.buses.piano, ctx.currentTime, midi, velocity));
+    this.pianoVoices.set(midi, this.pianoVoice(ctx, this.buses.piano, ctx.currentTime, midi, velocity));
   }
 
   pianoNoteOff(midi: number): void {
@@ -288,6 +295,30 @@ export class AudioEngine {
     this.ctx = null;
     this.backingVoices.clear();
     this.pianoVoices.clear();
+  }
+
+  setPianoSound(sound: PianoSound): void {
+    this.pianoSound = sound;
+    if (sound === 'grand' && this.ctx) void this.sampledPiano.load(this.ctx);
+  }
+
+  /**
+   * Get the built-in piano ready before it's needed (a level with the built-in
+   * piano, Listen, melody guide). Waits for the samples up to `timeoutMs`; the
+   * synth covers any note whose samples haven't arrived.
+   */
+  async preparePiano(timeoutMs = 8000): Promise<void> {
+    if (this.pianoSound !== 'grand' || !this.ctx) return;
+    await this.sampledPiano.whenLoaded(this.ctx, timeoutMs);
+  }
+
+  private pianoVoice(ctx: AudioContext, out: AudioNode, t: number, midi: number, velocity127: number): Voice {
+    if (this.pianoSound === 'grand') {
+      const sampled = this.sampledPiano.voice(ctx, out, t, midi, velocity127);
+      if (sampled) return sampled;
+      if (this.sampledPiano.status === 'idle') void this.sampledPiano.load(ctx);
+    }
+    return piano(ctx, out, t, midi, velocity127);
   }
 
   private track(voice: Voice): void {

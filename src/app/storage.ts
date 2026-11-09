@@ -1,6 +1,7 @@
 /** Small, defensive localStorage wrapper (private mode / blocked storage must never break the game). */
 import type { ProgressMap } from '../game-engine/progression';
 import type { GameMode } from '../song-content/level';
+import type { PianoSound } from '../audio-engine/AudioEngine';
 
 export type TimingPreset = 'relaxed' | 'standard' | 'strict';
 
@@ -16,6 +17,8 @@ export interface Settings {
   preferredMode: GameMode;
   /** Who makes the piano sound: your instrument, the built-in synth, or auto (built-in unless a MIDI piano is connected). */
   pianoOutput: PianoOutput;
+  /** The built-in piano's sound: sampled grand (downloaded on first use) or the light synth. */
+  pianoSound: PianoSound;
   backingVolume: number;
   pianoVolume: number;
   metronomeVolume: number;
@@ -66,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastMidiDeviceId: null,
   preferredMode: 'flow',
   pianoOutput: 'auto',
+  pianoSound: 'grand',
   backingVolume: 0.8,
   pianoVolume: 0.9,
   metronomeVolume: 0.6,

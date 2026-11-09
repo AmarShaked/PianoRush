@@ -111,7 +111,9 @@ Check that your license covers this use. ACUM mainly licenses performance of the
 - **Sync.** The music follows the same song timeline as the tiles and the scoring, and is scheduled ahead. Speaker latency is compensated by mapping the browser's audio clock to the game clock (re-measured continuously), so there is no drift. Pause, resume, restart and Discover waits all stop and resume cleanly.
 - **Piano sound.**
   - **My piano:** your instrument makes the sound.
-  - **Built-in piano:** velocity-sensitive.
+  - **Built-in piano:** velocity-sensitive. Choose it in Settings → Sound:
+    - **Grand piano (sampled)**, the default: a Yamaha C5 grand recorded as [Salamander Grand Piano V3](https://freepats.zenvoid.org/Piano/acoustic-grand-piano.html) by Alexander Holm (CC BY 3.0). It has every minor third from A0 to C8 at 4 loudness layers, about 6 MB. It downloads the first time the built-in piano plays and then works offline. Until it arrives, and if the download fails, the synth plays instead.
+    - **Light synth piano:** no download.
   - **Auto:** built-in only when nothing else makes sound.
 - **Volumes.** Backing, built-in piano, clicks and **sound effects** each have a slider. There are 4 count-in clicks, plus an optional metronome.
 - **Calibration** (Settings → Timing & display):
@@ -139,7 +141,7 @@ Check that your license covers this use. ACUM mainly licenses performance of the
 
 ## Offline and install
 
-The production build is **offline-first**: after one visit, the code, songs and backing (synthesized) work with no network. It is also installable (manifest, icons, fullscreen landscape). Updates arrive the next time you're online.
+The production build is **offline-first**: after one visit, the code, songs and backing (synthesized) work with no network. The grand piano samples are not part of that first download: they are fetched the first time the built-in piano plays, and work offline from then on. It is also installable (manifest, icons, fullscreen landscape). Updates arrive the next time you're online.
 
 ## Browser compatibility
 
@@ -160,11 +162,12 @@ src/
   game-engine/    Transport (pauses, waits), matching, chords, holds, Discover, scoring, progression
   piano-input/    PianoEvent contract · Web MIDI · keyboard · microphone (YIN + tracker) · native bridge
   song-content/   Schema, validation, chords, part generators, practice tools, World 1–6 + Hits, MIDI import (midi/)
-  audio-engine/   Clock sync, arranger, scheduler, synths, built-in piano, calibration analysis
+  audio-engine/   Clock sync, arranger, scheduler, synths, sampled grand piano, calibration analysis
   game-renderer/  PixiJS view (lanes, black keys, hands, fingers, chord bars, effects)
   pwa/            Build-time service-worker generator
   app/            React screens and orchestration (setup, home, game, results, calibration, diagnostics, import), My Songs library
 content/licensed/ Your licensed song packs (git-ignored; README only)
+public/samples/salamander/  Grand piano samples (CC BY 3.0, see README.txt), built by scripts/build-salamander.sh
 docs/
   ARCHITECTURE.md · PRD_COVERAGE.md · PLATFORMS.md · MANUAL_TEST_CHECKLIST.md
 ```
@@ -178,5 +181,5 @@ docs/
 - **Not verified on real hardware.** Nobody has tested with a physical MIDI piano, a real acoustic piano through a microphone, a real GPU (60 FPS), or by ear on real speakers. Use [docs/MANUAL_TEST_CHECKLIST.md](docs/MANUAL_TEST_CHECKLIST.md).
 - **Microphone** is monophonic and beta. A loud backing on speakers can leak into the mic, so use headphones.
 - **No native iOS/Android apps are built.** The bridge and the evaluation are in place (see PLATFORMS.md).
-- **Synthesized audio:** pleasant, but not a sampled grand piano or a recorded band.
+- **Backing band is synthesized:** pleasant, but not a recorded band. The built-in piano is sampled (Salamander), apart from the light synth option.
 - **Progress lives in the browser:** no accounts or sync, by design (PRD §16).
