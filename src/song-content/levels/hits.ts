@@ -21,8 +21,12 @@ import {
   type PublicDomainTune,
 } from '../songs/publicDomain';
 
+import danceMonkeyData from '../songs/licensed/dance-monkey.json';
+import loveTonightData from '../songs/licensed/love-tonight.json';
+
 /*
- * Hits — famous public-domain songs for free play, open from the start.
+ * Hits — famous songs for free play, open from the start: licensed hits
+ * (imported from the owner's licensed MIDI files) and public-domain classics.
  * Faster tempos and full-energy arrangements; separate progress from World 1.
  */
 
@@ -63,12 +67,31 @@ function hit(
   };
 }
 
+/** A licensed hit, converted from MIDI by the importer (see song-content/midi). */
+function licensedHit(id: string, data: unknown, objective: string, number: number): LevelDefinition {
+  const song = { ...(data as SongDefinition), id };
+  return {
+    id,
+    world: 0,
+    number,
+    title: song.title,
+    objective,
+    hand: 'right',
+    song,
+    modes: ['discover', 'flow', 'challenge'],
+    completion: { minNoteAccuracy: 0.5 },
+    stars: { two: 0.8, three: 0.95 },
+  };
+}
+
 export const HITS: WorldDefinition = {
   id: 0,
   kind: 'freeplay',
   title: 'Hits',
   subtitle: 'Famous songs, free play — all open',
   levels: [
+    licensedHit('hits-dance-monkey', danceMonkeyData, 'The 2019 smash, over a full dance beat (F# minor).', 0),
+    licensedHit('hits-love-tonight', loveTonightData, 'The Lion King love theme: hook, strings melody, hook again.', 0),
     hit('hits-ode-to-joy', ODE_TO_JOY_ORIGINAL_RHYTHM, 120, 'dance', "Beethoven's melody, with its real dotted rhythm.", 1),
     hit('hits-jingle-bells', JINGLE_BELLS, 126, 'pop', 'The full-speed sleigh ride.', 2),
     hit('hits-saints', SAINTS, 120, 'groove', 'Swing those long notes.', 3),

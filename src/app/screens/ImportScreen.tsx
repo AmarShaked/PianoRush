@@ -19,9 +19,9 @@ function slug(s: string): string {
 }
 
 /**
- * Import a licensed song from a MIDI file into "My Songs" (stored only in this
- * browser), optionally with a recorded backing track. Requires a licence
- * reference and an explicit rights confirmation.
+ * Import a song from a MIDI file into "My Songs" (stored only in this
+ * browser), optionally with a recorded backing track. Rights to the imported
+ * material are the importing user's responsibility.
  */
 export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
   const [smf, setSmf] = useState<SmfFile | null>(null);
@@ -30,10 +30,6 @@ export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
   const [tracks, setTracks] = useState<number[]>([]);
   const [title, setTitle] = useState('');
   const [credit, setCredit] = useState('');
-  const [holder, setHolder] = useState('ACUM');
-  const [reference, setReference] = useState('');
-  const [territory, setTerritory] = useState('');
-  const [confirmed, setConfirmed] = useState(false);
   const [hand, setHand] = useState<Hand | 'both'>('right');
   const [keepChords, setKeepChords] = useState(false);
   const [grid, setGrid] = useState(0.5);
@@ -90,7 +86,7 @@ export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [smf, tracks, hand, keepChords, grid, fromBar, toBar, transpose, style, audio, audioOffset, title, credit]);
   const result = preview && 'song' in preview ? preview : null;
-  const canSave = !!result && confirmed && reference.trim().length > 0 && !saving;
+  const canSave = !!result && !saving;
 
   /** Listen to the first bars of a track (built-in piano) to find the melody. */
   function listen(trackIndex: number) {
@@ -114,10 +110,7 @@ export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
   async function save() {
     if (!result || !canSave) return;
     setSaving(true);
-    const song: SongDefinition = {
-      ...result.song,
-      license: { holder: holder.trim(), reference: reference.trim(), ...(territory.trim() ? { territory: territory.trim() } : {}) },
-    };
+    const song: SongDefinition = result.song;
     await saveMySong({ id: song.id, song, ...(audio ? { audio } : {}), addedAt: Date.now() });
     setSaving(false);
     onSaved();
@@ -127,12 +120,11 @@ export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
     if (!result) return;
     const song: SongDefinition = {
       ...result.song,
-      license: { holder: holder.trim(), reference: reference.trim(), ...(territory.trim() ? { territory: territory.trim() } : {}) },
       ...(audio && result.song.backing
         ? { backing: { ...result.song.backing, audio: { url: `licensed/${audio.name}`, offsetMs: audioOffset } } }
         : {}),
     };
-    const pack = { title: 'Licensed songs', license: song.license, songs: [song] };
+    const pack = { title: 'My songs', songs: [song] };
     const url = URL.createObjectURL(new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url;
@@ -147,7 +139,7 @@ export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
         <button className="btn btn-ghost" onClick={onCancel}>
           ← Back
         </button>
-        <h1>Import a licensed song</h1>
+        <h1>Import a song</h1>
       </header>
 
       <div className="diag-grid">
@@ -189,7 +181,7 @@ export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
             </>
           )}
 
-          <h2>2 · Song &amp; licence</h2>
+          <h2>2 · Song</h2>
           <label className="field">
             <span>Title</span>
             <input className="text" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -197,27 +189,6 @@ export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
           <label className="field">
             <span>Credit (composer / publisher)</span>
             <input className="text" value={credit} onChange={(e) => setCredit(e.target.value)} />
-          </label>
-          <div className="field-row">
-            <label className="field">
-              <span>Licensed through</span>
-              <input className="text" value={holder} onChange={(e) => setHolder(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Licence reference *</span>
-              <input className="text" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. 12345/2026" />
-            </label>
-            <label className="field">
-              <span>Territory</span>
-              <input className="text" value={territory} onChange={(e) => setTerritory(e.target.value)} placeholder="e.g. Israel" />
-            </label>
-          </div>
-          <label className="toggle">
-            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-            <span className="small">
-              I confirm I hold the rights to use this song (and recording, if attached) in Piano Rush for where I use it — including any
-              licence the MIDI arrangement itself requires.
-            </span>
           </label>
         </section>
 
@@ -315,11 +286,10 @@ export function ImportScreen({ onSaved, onCancel }: ImportScreenProps) {
             <button className="btn btn-primary" disabled={!canSave} onClick={() => void save()}>
               {saving ? 'Saving…' : 'Save to My Songs'}
             </button>
-            <button className="btn btn-secondary" disabled={!result || !confirmed || !reference.trim()} onClick={exportPack}>
+            <button className="btn btn-secondary" disabled={!result} onClick={exportPack}>
               Export pack file (for your own builds)
             </button>
           </div>
-          {!confirmed || !reference.trim() ? <p className="small muted center">A licence reference and the rights confirmation are required.</p> : null}
         </section>
       </div>
     </main>

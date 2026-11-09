@@ -76,5 +76,5 @@ export function mySongsCollection(stored: readonly StoredSong[]): WorldDefinitio
       stars: { two: 0.8, three: 0.95 },
     };
   });
-  return { id: -1, kind: 'freeplay', title: 'My Songs', subtitle: 'Songs you imported from your own licensed MIDI files', levels };
+  return { id: -1, kind: 'freeplay', title: 'My Songs', subtitle: 'Songs you imported from MIDI files', levels };
 }

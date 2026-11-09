@@ -292,7 +292,9 @@ export function midiToSong(smf: SmfFile, options: ImportOptions): ImportResult {
   const accompClipped = clip(accomp).map((n) => ({ ...n, midi: n.midi + transpose }));
   // Both lists are already transposed, so the inferred chords are in the played key.
   const key = estimateKey([...accompClipped, ...notes]);
-  const chords = inferChords(accompClipped, notes, endBeat, bpb === 4 ? 2 : bpb, key.flats);
+  const lastNoteEnd = Math.max(...notes.map((n) => n.end));
+  // No chord changes after the last note: the backing ends with the melody.
+  const chords = inferChords(accompClipped, notes, endBeat, bpb === 4 ? 2 : bpb, key.flats).filter(([b], i) => i === 0 || b < lastNoteEnd - 1e-9);
   if (accompClipped.length === 0) warnings.push('No accompaniment track found; chords were guessed from the melody.');
 
   const songNotes: SongNote[] = notes.map((n) => ({ midi: n.midi, startBeat: n.start, durationBeats: n.end - n.start, hand: n.hand }));

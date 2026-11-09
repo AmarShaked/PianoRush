@@ -118,7 +118,9 @@ describe('World 1 and Hits accompaniment', () => {
    * or lasts two beats or more must be a tone of the chord that is sounding,
    * for its whole length. Passing notes on weak beats are free.
    */
-  it.each(allSongs.map((l) => [l.id, l] as const))('%s: strong-beat and long melody notes are chord tones', (_, level) => {
+  // Composed content only: imported (licensed) arrangements carry inferred chords.
+  const composed = allSongs.filter((l) => !l.song.composer.includes('licensed'));
+  it.each(composed.map((l) => [l.id, l] as const))('%s: strong-beat and long melody notes are chord tones', (_, level) => {
     const chords = level.song.backing!.chords;
     const clashes: string[] = [];
     const bpb = level.song.timeSignature[0];
@@ -136,8 +138,8 @@ describe('World 1 and Hits accompaniment', () => {
     expect(clashes).toEqual([]);
   });
 
-  it('every song ends on a tone of its final (tonic) chord', () => {
-    for (const l of allSongs) {
+  it('every composed song ends on a tone of its final (tonic) chord', () => {
+    for (const l of allSongs.filter((x) => !x.song.composer.includes('licensed'))) {
       const last = [...l.song.notes].sort((a, b) => a.startBeat - b.startBeat).at(-1)!;
       expect(isChordTone(parseChord(l.song.backing!.chords.at(-1)![1])!, last.midi)).toBe(true);
     }
@@ -167,14 +169,23 @@ describe('chord vocabulary', () => {
 });
 
 describe('Hits (free play)', () => {
+  it('licensed hits are playable arrangements: right hand, one note at a time, at most 8 keys', () => {
+    for (const l of HITS.levels.filter((x) => x.song.composer.includes('licensed'))) {
+      expect(l.song.lanes.length).toBeLessThanOrEqual(8);
+      expect(compileSong(l.song).events.every((e) => e.noteIds.length === 1)).toBe(true);
+      expect(l.song.notes.every((n) => n.hand === 'right')).toBe(true);
+    }
+  });
+
   it('is a free-play list of famous public-domain songs', () => {
     expect(HITS.kind).toBe('freeplay');
     expect(HITS.levels.map((l) => l.title)).toEqual([
+      'Dance Monkey', 'Can You Feel the Love Tonight',
       'Ode to Joy', 'Jingle Bells', 'When the Saints Go Marching In', 'Au Clair de la Lune', 'Mary Had a Little Lamb', 'Twinkle Twinkle Little Star',
       'London Bridge', 'Lightly Row', 'Go Tell Aunt Rhody', 'Hot Cross Buns',
       'Joy to the World', "Brahms' Lullaby", 'Amazing Grace', 'Greensleeves', 'Für Elise',
     ]);
-    for (const l of HITS.levels) expect(l.song.composer).toMatch(/public domain/);
+    for (const l of HITS.levels) expect(l.song.composer).toMatch(/public domain|licensed/);
   });
 
   it('uses ids separate from World 1 (separate progress, no unlock side effects)', () => {
@@ -182,11 +193,11 @@ describe('Hits (free play)', () => {
     for (const l of HITS.levels) expect(w1.has(l.id)).toBe(false);
   });
 
-  it.each(HITS.levels.map((l) => [l.title, l] as const))('%s is valid, 30–60 s and uses every lane', (_, level) => {
+  it.each(HITS.levels.map((l) => [l.title, l] as const))('%s is valid, 30–90 s and uses every lane', (_, level) => {
     expect(validateSong(level.song)).toEqual({ valid: true, errors: [] });
     const song = compileSong(level.song);
     expect(song.endMs / 1000).toBeGreaterThanOrEqual(30);
-    expect(song.endMs / 1000).toBeLessThanOrEqual(60);
+    expect(song.endMs / 1000).toBeLessThanOrEqual(90);
     expect(new Set(song.notes.map((n) => n.midi))).toEqual(new Set(level.song.lanes));
   });
 

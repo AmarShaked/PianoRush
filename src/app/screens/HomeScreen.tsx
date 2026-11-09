@@ -127,11 +127,11 @@ export function HomeScreen(props: HomeScreenProps) {
           <p className="muted small">{world.subtitle}</p>
           {mySongs && (
             <button className="btn btn-secondary btn-small" onClick={onImport}>
-              + Import a licensed song (MIDI)
+              + Import a song (MIDI)
             </button>
           )}
           {mySongs && levels.length === 0 && (
-            <p className="small muted">No imported songs yet. Import a MIDI file you hold the rights to — it stays in this browser.</p>
+            <p className="small muted">No imported songs yet. Import a MIDI file — it stays in this browser.</p>
           )}
 
           {levels.length > 0 && <ol className="level-grid">

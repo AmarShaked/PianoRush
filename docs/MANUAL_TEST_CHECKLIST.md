@@ -37,7 +37,8 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 
 ## Licensed songs (import)
 - [ ] My Songs → Import: a format-1 file lists named tracks, and a format-0 file lists one entry per channel. ▶ listen plays the right part
-- [ ] The preview shows the key, the bars, the number of keys and sensible chords. Save needs a license reference and the confirmation
+- [ ] The preview shows the key, the bars, the number of keys and sensible chords
+- [ ] Hits: Dance Monkey and Can You Feel the Love Tonight sound recognisable, and the band's chords fit (they were inferred from the MIDI accompaniment)
 - [ ] The imported song plays with the generated band in the right key. Changing the grid, hand, bar range or transpose changes the preview
 - [ ] With a recorded backing attached and the bar-1 offset set: the recording lines up with the tiles, pause/resume stays in sync, and 75% speed uses the band instead
 - [ ] Export pack file → put it in `content/licensed/` → `npm run dev`: a 🎬 collection appears. `git status` shows nothing to commit
