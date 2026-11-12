@@ -24,6 +24,7 @@ import { ResultsScreen } from './screens/ResultsScreen';
 import { DiagnosticsScreen } from './screens/DiagnosticsScreen';
 import { CalibrationScreen } from './screens/CalibrationScreen';
 import { SetupScreen, type SetupStep } from './screens/SetupScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 
 const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator, microphoneInput, nativeMidi];
 const FIRST_LEVEL = LEVELS[0]!;
@@ -55,8 +56,9 @@ type Screen =
       readonly outcome: RunOutcome;
       readonly update: ProgressUpdate;
     }
+  | { readonly name: 'settings' }
   | { readonly name: 'diagnostics' }
-  | { readonly name: 'calibration'; readonly returnTo: 'home' | 'setup' }
+  | { readonly name: 'calibration'; readonly returnTo: 'settings' | 'setup' }
   | { readonly name: 'import' }
   | { readonly name: 'setup'; readonly step: SetupStep };
 
@@ -158,7 +160,7 @@ export function App() {
   );
 
   const toHome = useCallback(() => setScreen({ name: 'home' }), []);
-  const mode = settings.preferredMode;
+  const toSettings = useCallback(() => setScreen({ name: 'settings' }), []);
 
   switch (screen.name) {
     case 'game':
@@ -213,7 +215,21 @@ export function App() {
           keyboardSimulatorEnabled={settings.keyboardSimulator}
           onKeyboardSimulatorChange={(v) => updateSettings({ keyboardSimulator: v })}
           lanes={[60, 62, 64, 65, 67]}
+          onBack={toSettings}
+        />
+      );
+    case 'settings':
+      return (
+        <SettingsScreen
+          mic={mic}
+          nativeDevices={nativeDevices}
+          midi={midi}
+          settings={settings}
+          onSettingsChange={updateSettings}
           onBack={toHome}
+          onCalibrate={() => setScreen({ name: 'calibration', returnTo: 'settings' })}
+          onSetup={() => setScreen({ name: 'setup', step: 'welcome' })}
+          onDiagnostics={() => setScreen({ name: 'diagnostics' })}
         />
       );
     case 'calibration':
@@ -225,9 +241,9 @@ export function App() {
           configLabel={describeConfig(configKey())}
           onApply={(offset) => {
             updateSettings({ calibrations: { ...settings.calibrations, [configKey()]: offset } });
-            setScreen(screen.returnTo === 'setup' ? { name: 'setup', step: 'ready' } : { name: 'home' });
+            setScreen(screen.returnTo === 'setup' ? { name: 'setup', step: 'ready' } : { name: 'settings' });
           }}
-          onBack={() => setScreen(screen.returnTo === 'setup' ? { name: 'setup', step: 'ready' } : { name: 'home' })}
+          onBack={() => setScreen(screen.returnTo === 'setup' ? { name: 'setup', step: 'ready' } : { name: 'settings' })}
         />
       );
     case 'import':
@@ -276,17 +292,16 @@ export function App() {
           progress={progress}
           selected={selected}
           onSelect={setSelected}
-          mode={mode}
-          onModeChange={(m) => updateSettings({ preferredMode: m })}
           midi={midi}
           settings={settings}
           onSettingsChange={updateSettings}
-          onPlay={() => startLevel(selected, mode)}
+          onPlay={(m) => {
+            updateSettings({ preferredMode: m });
+            startLevel(selected, m);
+          }}
           onListen={() => startLevel(selected, 'flow', settings.practiceSpeed, null, { listen: true })}
-          onPracticeSection={(section) => startLevel(selected, mode, settings.practiceSpeed, section)}
-          onDiagnostics={() => setScreen({ name: 'diagnostics' })}
-          onCalibrate={() => setScreen({ name: 'calibration', returnTo: 'home' })}
-          onSetup={() => setScreen({ name: 'setup', step: 'welcome' })}
+          onPracticeSection={(section) => startLevel(selected, settings.preferredMode, settings.practiceSpeed, section)}
+          onSettings={toSettings}
         />
       );
   }

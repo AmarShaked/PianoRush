@@ -14,7 +14,7 @@ import { audioEngine } from '../inputs';
 import { useSampledPiano } from '../components/PianoSoundPicker';
 import { CHALLENGE_WINDOWS, TIMING_PRESETS, type Settings } from '../storage';
 
-export const MODE_LABEL: Record<GameMode, string> = { discover: 'Discover', flow: 'Flow', challenge: 'Challenge' };
+export const MODE_LABEL: Record<GameMode, string> = { discover: 'Learn', flow: 'Play', challenge: 'Challenge' };
 
 interface GameScreenProps {
   level: LevelDefinition;
@@ -283,7 +283,7 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
             ) : (
               <span className={`mode-badge mode-${mode}`}>{MODE_LABEL[mode]}</span>
             )}
-            {guide && <span className="mode-badge speed-badge">🎹 Guide</span>}
+            {guide && <span className="mode-badge speed-badge">🎹 Helper</span>}
             {speed < 1 && <span className="mode-badge speed-badge">{Math.round(speed * 100)}%</span>}
             {section && (
               <span className="mode-badge speed-badge">
@@ -309,7 +309,7 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
             <span ref={comboRef}>0×</span>
           </div>
           <button
-            className="icon-btn"
+            className="icon-btn pause-btn"
             onClick={() => session?.togglePause()}
             aria-label={paused ? 'Resume' : 'Pause'}
             disabled={state === 'finished' || state === 'ready'}
@@ -341,7 +341,7 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
       {paused && (
         <div className="overlay">
           <div className="card overlay-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
-            <h2 id="pause-title">Paused</h2>
+            <h2 id="pause-title">⏸️ Paused</h2>
             <p className="muted small">
               {level.title} · {listen ? 'Listen' : MODE_LABEL[mode]}
             </p>
@@ -358,7 +358,7 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
             )}
             <div className="overlay-actions">
               <button className="btn btn-primary" autoFocus onClick={() => session?.resume()}>
-                Resume
+                ▶ Keep playing
               </button>
               <button
                 className="btn btn-secondary"
@@ -367,10 +367,10 @@ export function GameScreen({ level, song, mode, speed, section = null, inputs, s
                   session?.restart(startDelayMs());
                 }}
               >
-                Restart
+                ↻ Start over
               </button>
               <button className="btn btn-ghost" onClick={onQuit}>
-                Quit to menu
+                🏠 Home
               </button>
             </div>
             <p className="small muted">Esc: resume · R: restart</p>

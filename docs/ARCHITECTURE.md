@@ -11,7 +11,7 @@
 
 ```
             ┌──────────────────────── app/ (React) ────────────────────────┐
-            │ App · StartScreen · GameScreen · ResultsScreen · Diagnostics │
+            │ App · Home · Settings · Game · Results · Setup · Diagnostics │
             │ GameSession (framework-free orchestration, unit-tested)      │
             └──────┬───────────────┬───────────────┬──────────────┬────────┘
                    │               │               │              │
@@ -210,6 +210,7 @@ performance.now()  ──►  PianoEvent.time        (MIDI: MIDIMessageEvent.tim
 
 - `GameSession` connects the inputs to the engine. It auto-pauses on device disconnect, exposes `frame()`, and handles `restart()` without reloading. It is unit-tested with a `ManualClock`.
 - `GameScreen` updates the HUD (score, combo, progress) through refs instead of per-frame React renders. It pauses when the tab is hidden, and its hotkeys are Esc/P and R.
+- **Menus** are built for kids. `HomeScreen` holds only the world strip (`components/worldLook.ts` gives each collection its emoji and colour), a `LevelMap` (path worlds: a winding SVG path of big stops) or a song-card grid (free play), and the top bar. Tapping a level opens `LevelSheet`, with big Listen / Learn (`discover`) / Play (`flow`) buttons; speed, the melody guide ("play-along helper") and section practice sit under its ⚙️ More. Every other setting lives on `SettingsScreen`, which Calibration and Diagnostics return to. The UI calls the modes Learn / Play / Challenge (`MODE_LABEL`), while the code keeps `discover` / `flow` / `challenge`.
 - `storage.ts` persists settings, the last MIDI device and best scores in `localStorage`, and tolerates storage being unavailable.
 
 ## MVP completion (M4)

@@ -1,21 +1,14 @@
 import { useState } from 'react';
-import { DEFAULT_KEY_MAP, keyLabel } from '../../piano-input/KeyboardSimulator';
-import { midiToNoteName } from '../../piano-input/noteNames';
 import { isPlayable, songFor, type PracticeSection } from '../catalog';
-import { findPhrases, repeatedPatterns } from '../../song-content/practice';
-import { GAME_MODES, type GameMode, type LevelDefinition, type WorldDefinition } from '../../song-content/level';
-import { PRACTICE_SPEEDS, totalStars, type ProgressMap } from '../../game-engine/progression';
-import { InputPanel } from '../components/InputPanel';
-import { MiniKeyboard } from '../components/MiniKeyboard';
-import { PianoSoundPicker } from '../components/PianoSoundPicker';
+import type { GameMode, LevelDefinition, WorldDefinition } from '../../song-content/level';
+import { totalStars, type ProgressMap } from '../../game-engine/progression';
+import { LevelMap } from '../components/LevelMap';
+import { LevelSheet } from '../components/LevelSheet';
 import { Stars } from '../components/Stars';
-import { TIMING_PRESETS, type PianoOutput, type Settings, type TimingPreset, type VisualEffects } from '../storage';
-import { describeConfig } from '../calibrationKeys';
-import { audioEngine } from '../inputs';
-import { isHighLatency } from '../../audio-engine/calibration';
+import { lookStyle, worldLook } from '../components/worldLook';
+import type { Settings } from '../storage';
 import type { useMidi } from '../useMidi';
 import type { MicState } from '../useMic';
-import { MODE_LABEL } from './GameScreen';
 
 interface HomeScreenProps {
   mic: MicState;
@@ -26,410 +19,218 @@ interface HomeScreenProps {
   progress: ProgressMap;
   selected: LevelDefinition;
   onSelect: (level: LevelDefinition) => void;
-  mode: GameMode;
-  onModeChange: (mode: GameMode) => void;
   midi: ReturnType<typeof useMidi>;
   settings: Settings;
   onSettingsChange: (patch: Partial<Settings>) => void;
-  onPlay: () => void;
+  onPlay: (mode: GameMode) => void;
   /** Listen mode: watch and hear the song played for you. */
   onListen: () => void;
-  onDiagnostics: () => void;
-  onCalibrate: () => void;
-  onSetup: () => void;
   onPracticeSection: (section: PracticeSection) => void;
+  onSettings: () => void;
   onImport: () => void;
   onDeleteSong: (level: LevelDefinition) => void;
 }
 
-const KEY_HINTS: Record<number, string> = Object.fromEntries(
-  Object.entries(DEFAULT_KEY_MAP).map(([code, note]) => [note, keyLabel(code)]),
-);
-
-const MODE_INFO: Record<GameMode, { icon: string; text: string }> = {
-  discover: { icon: '🧭', text: 'Learn the notes. The music waits for you. (Practice — no stars)' },
-  flow: { icon: '🎵', text: 'Play along at full tempo. The music keeps going. Earn stars.' },
-  challenge: { icon: '🏆', text: 'Strict timing. Clear it to earn the trophy.' },
-};
-
-function Slider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
-  return (
-    <label className="field slider">
-      <span>
-        {label} <b>{Math.round(value * 100)}%</b>
-      </span>
-      <input type="range" min={0} max={1} step={0.05} value={value} onChange={(e) => onChange(Number(e.target.value))} />
-    </label>
-  );
-}
-
+/**
+ * Level select, made for kids: pick a world at the top, tap a stop on the
+ * path (or a song card), then Listen / Learn / Play in the card that opens.
+ * Everything else lives behind the ⚙️ button.
+ */
 export function HomeScreen(props: HomeScreenProps) {
-  // A collection with no songs yet (e.g. an empty "My Songs") can still be opened.
+  const { mic, nativeDevices, collections, world: selectedWorld, progress, selected, onSelect, midi, settings, onSettingsChange } = props;
+  const { onPlay, onListen, onPracticeSection, onSettings, onImport, onDeleteSong } = props;
+  // A collection with no songs yet (an empty "My Songs") can still be opened.
   const [emptyTab, setEmptyTab] = useState<WorldDefinition | null>(null);
-  const { mic, nativeDevices, collections, world: selectedWorld, progress, selected, onSelect, mode, onModeChange, midi, settings, onSettingsChange, onPlay, onListen, onDiagnostics, onCalibrate, onSetup, onPracticeSection, onImport, onDeleteSong } = props;
-  const latency = audioEngine.latency;
-  const outputLatencyMs = latency?.output != null ? Math.round(latency.output * 1000) : null;
+  const [sheetOpen, setSheetOpen] = useState(false);
   const world = emptyTab ?? selectedWorld;
-  const mySongs = world.id === -1;
+  const look = worldLook(world);
   const levels = world.levels;
-  const freePlay = world.kind === 'freeplay';
-  const isOpen = (i: number) => isPlayable(levels[i]!, progress);
-  const selectedIndex = levels.indexOf(selected);
-  const song = songFor(selected);
-  const unlocked = isOpen(selectedIndex);
-  const hasInput = midi.listening || settings.keyboardSimulator || mic.status === 'listening' || nativeDevices.length > 0;
-  const hasChords = song.events.some((e) => e.noteIds.length > 1);
+  const mySongs = world.id === -1;
+  const open = (l: LevelDefinition) => isPlayable(l, progress);
+  const current = world.kind === 'path' ? (levels.find((l) => open(l) && !progress[l.id]?.completed) ?? null) : null;
 
-  const seconds = Math.round((song.endMs + song.countInMs) / 1000);
-  const p = progress[selected.id];
-  const path = collections.filter((c) => c.kind === 'path').flatMap((c) => c.levels);
-  const earned = totalStars(path, progress);
+  const pathLevels = collections.filter((c) => c.kind === 'path').flatMap((c) => c.levels);
+  const earned = totalStars(pathLevels, progress);
+  const hasInput = midi.listening || settings.keyboardSimulator || mic.status === 'listening' || nativeDevices.length > 0;
+  const pick = (level: LevelDefinition) => {
+    setEmptyTab(null);
+    onSelect(level);
+    setSheetOpen(true);
+  };
+
+  const selectedIndex = levels.indexOf(selected);
+  const previous = selectedIndex > 0 ? levels[selectedIndex - 1] : null;
+  const lockedText =
+    world.kind === 'path' && selected.number === 1
+      ? `Finish the last level of the world before to open this one!`
+      : `Finish “${previous?.title ?? 'the level before'}” to open this level!`;
 
   return (
     <main className="screen home-screen">
-      <header className="home-header">
+      <header className="top-bar">
         <h1 className="logo">
           Piano<span>Rush</span>
         </h1>
-        <div className="star-total" aria-label={`${earned} of ${path.length * 3} stars collected`}>
-          ★ {earned} / {path.length * 3}
+        <div className="top-bar-right">
+          <InputChip midi={midi} mic={mic} nativeDevices={nativeDevices} keyboard={settings.keyboardSimulator} onClick={onSettings} />
+          <div className="star-total" aria-label={`${earned} of ${pathLevels.length * 3} stars collected`}>
+            ⭐ {earned}
+          </div>
+          <button className="round-btn" onClick={onSettings} aria-label="Settings" title="Settings">
+            ⚙️
+          </button>
         </div>
       </header>
 
-      <div className="start-grid">
-        <section className="card world-card" aria-label={world.title}>
-          <div className="collection-tabs" role="tablist" aria-label="Song collections">
-            {collections.map((c) => (
-              <button
-                key={c.id}
-                role="tab"
-                aria-selected={c === world}
-                className={`collection-tab${c === world ? ' active' : ''}`}
-                onClick={() => {
-                  if (c === world) return;
-                  if (c.levels.length === 0) {
-                    setEmptyTab(c);
-                    return;
-                  }
-                  setEmptyTab(null);
-                  // Jump to the first open, unfinished entry of that collection.
-                  const first = c.levels.find((l) => isPlayable(l, progress) && !progress[l.id]?.completed);
-                  onSelect(first ?? c.levels[0]!);
-                }}
-              >
-                {c.kind === 'path' ? (
-                  <>
-                    <span className="tab-num">{c.id}</span> {c.title}
-                  </>
-                ) : (
-                  `${c.id === -1 ? '🎵' : c.id >= 100 ? '🎬' : '🔥'} ${c.title}`
-                )}
-              </button>
-            ))}
-          </div>
-          <p className="muted small">{world.subtitle}</p>
-          {mySongs && (
-            <button className="btn btn-secondary btn-small" onClick={onImport}>
-              + Import a song (MIDI)
+      <nav className="world-strip" aria-label="Worlds">
+        {collections.map((c) => {
+          const cl = worldLook(c);
+          const active = c === world;
+          const stars = c.kind === 'path' ? totalStars(c.levels, progress) : null;
+          const lockedWorld = c.kind === 'path' && c.levels.length > 0 && !open(c.levels[0]!);
+          return (
+            <button
+              key={c.id}
+              className={`world-chip${active ? ' active' : ''}${lockedWorld ? ' locked' : ''}`}
+              style={lookStyle(cl)}
+              aria-pressed={active}
+              onClick={() => {
+                if (active) return;
+                if (c.levels.length === 0) {
+                  setEmptyTab(c);
+                  return;
+                }
+                setEmptyTab(null);
+                // Jump to the first open, unfinished entry of that collection.
+                const first = c.levels.find((l) => open(l) && !progress[l.id]?.completed);
+                onSelect(first ?? c.levels[0]!);
+              }}
+            >
+              <span className="world-emoji" aria-hidden>
+                {lockedWorld ? '🔒' : cl.emoji}
+              </span>
+              <span className="world-name">{c.title}</span>
+              {stars !== null && <span className="world-stars">⭐ {stars}/{c.levels.length * 3}</span>}
             </button>
-          )}
-          {mySongs && levels.length === 0 && (
-            <p className="small muted">No imported songs yet. Import a MIDI file — it stays in this browser.</p>
-          )}
+          );
+        })}
+      </nav>
 
-          {levels.length > 0 && <ol className="level-grid">
+      <section className="world-stage" style={lookStyle(look)} aria-label={world.title}>
+        {world.kind === 'path' ? (
+          <LevelMap levels={levels} progress={progress} isOpen={open} current={current} onPick={pick} />
+        ) : (
+          <ul className="song-grid">
+            {mySongs && (
+              <li>
+                <button className="song-card add-song" onClick={onImport}>
+                  <span className="song-art" aria-hidden>
+                    ＋
+                  </span>
+                  <span className="song-title">Add a song</span>
+                  <span className="song-artist">from a MIDI file</span>
+                </button>
+              </li>
+            )}
             {levels.map((level, i) => {
-              const open = isOpen(i);
               const lp = progress[level.id];
-              const isNext = open && !lp?.completed;
+              const art = SONG_ART[i % SONG_ART.length]!;
               return (
                 <li key={level.id}>
-                  <button
-                    className={`level-tile${level === selected ? ' selected' : ''}${open ? '' : ' locked'}${isNext ? ' next' : ''}`}
-                    onClick={() => {
-                      setEmptyTab(null);
-                      onSelect(level);
-                    }}
-                    aria-pressed={level === selected}
-                    aria-label={`Level ${level.number}: ${level.title}${open ? `, ${lp?.bestStars ?? 0} stars` : ', locked'}`}
-                  >
-                    <span className="level-num">{!open ? '🔒' : freePlay ? '♪' : level.number}</span>
-                    <span className="level-name">{level.title}</span>
-                    {!freePlay && level.song.composer.includes('public domain') && <span className="famous" aria-hidden>★ hit</span>}
+                  <button className="song-card" onClick={() => pick(level)}>
+                    <span className="song-art" aria-hidden style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
+                      {art.emoji}
+                    </span>
+                    <span className="song-title">{level.title}</span>
+                    <span className="song-artist">{songArtist(level)}</span>
                     <Stars count={lp?.bestStars ?? 0} small />
-                    {lp?.challengeCleared && <span className="trophy" aria-hidden>🏆</span>}
                   </button>
                 </li>
               );
             })}
-          </ol>}
+          </ul>
+        )}
+      </section>
 
-          {levels.length > 0 && <div className="level-detail">
-            <div className="level-detail-head">
-              <div>
-                <div className="eyebrow">{freePlay ? 'Free play' : `Level ${selected.number}`}</div>
-                <h3 className="level-title">{selected.title}</h3>
-                <p className="objective">{selected.objective}</p>
-                <p className="muted small">
-                  {!freePlay && `“${selected.song.title}” · `}
-                  {selected.song.bpm} BPM · {seconds}s · keys {selected.song.lanes.map((m) => midiToNoteName(m, selected.song.preferFlats)).join(' ')}
-                </p>
-                <p className="muted small credit">{selected.song.composer}</p>
-                {selected.song.license && (
-                  <p className="small license-line">
-                    Licensed: {selected.song.license.holder} {selected.song.license.reference}
-                    {selected.song.license.territory ? ` · ${selected.song.license.territory}` : ''}
-                    {selected.song.backing?.audio ? ' · recorded backing' : ''}
-                  </p>
-                )}
-              </div>
-              {p && (p.bestScore > 0 || p.discoverPlayed) && (
-                <div className="best">
-                  <Stars count={p.bestStars} />
-                  <span className="muted small">Best {p.bestScore.toLocaleString()}</span>
-                </div>
-              )}
-            </div>
-
-            <MiniKeyboard
-              className="guide-keyboard"
-              from={Math.min(48, Math.floor(Math.min(...selected.song.lanes) / 12) * 12)}
-              to={Math.max(83, Math.ceil((Math.max(...selected.song.lanes) + 1) / 12) * 12 - 1)}
-              lanes={selected.song.lanes}
-              keyHints={settings.keyboardSimulator ? KEY_HINTS : {}}
-              preferFlats={selected.song.preferFlats}
-            />
-
-            <div className="mode-picker" role="radiogroup" aria-label="Game mode">
-              {GAME_MODES.filter((m) => selected.modes.includes(m)).map((m) => (
-                <button
-                  key={m}
-                  role="radio"
-                  aria-checked={mode === m}
-                  className={`mode-option mode-${m}${mode === m ? ' active' : ''}`}
-                  onClick={() => onModeChange(m)}
-                >
-                  <span className="mode-name">
-                    {MODE_INFO[m].icon} {MODE_LABEL[m]}
-                  </span>
-                  <span className="mode-text">{MODE_INFO[m].text}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="speed-picker" role="radiogroup" aria-label="Practice speed">
-              <span className="small muted">Speed</span>
-              {PRACTICE_SPEEDS.map((sp) => (
-                <button
-                  key={sp}
-                  role="radio"
-                  aria-checked={settings.practiceSpeed === sp}
-                  className={`speed-option${settings.practiceSpeed === sp ? ' active' : ''}`}
-                  onClick={() => onSettingsChange({ practiceSpeed: sp })}
-                >
-                  {sp === 1 ? 'Full' : `${sp * 100}%`}
-                </button>
-              ))}
-              {settings.practiceSpeed < 1 && <span className="small muted">practice: no stars</span>}
-            </div>
-
-            <label className="guide-toggle">
-              <input type="checkbox" checked={settings.melodyGuide} onChange={(e) => onSettingsChange({ melodyGuide: e.target.checked })} />
-              <span>
-                🎹 <b>Melody guide</b>: the piano plays the tune softly with you
-                {mode === 'discover' ? ' (and plays each note the song waits for)' : ''}
-                {settings.melodyGuide && <span className="muted"> · practice: no stars</span>}
-              </span>
-            </label>
-
-            <SectionPractice level={selected} disabled={!unlocked || !hasInput} onPick={onPracticeSection} />
-
-            <div className="play-row">
-              <button className="btn btn-secondary btn-listen" onClick={onListen} title="Watch and hear the whole song played for you (no score)">
-                👂 Listen
-              </button>
-              <button className="btn btn-primary btn-play" onClick={onPlay} disabled={!unlocked || !hasInput}>
-                ▶ Play {MODE_LABEL[mode]}
-                {settings.practiceSpeed < 1 ? ` · ${settings.practiceSpeed * 100}%` : ''}
-                {settings.melodyGuide ? ' · with guide' : ''}
-              </button>
-            </div>
-            {!unlocked && (
-              <p className="small warn-text center">
-                {selected.number === 1
-                  ? `Complete World ${selected.world - 1}'s final level to open World ${selected.world}.`
-                  : `Complete level ${selected.number - 1} to unlock this level.`}
-              </p>
-            )}
-            {unlocked && !hasInput && <p className="small warn-text center">Connect a MIDI piano or enable the keyboard simulator.</p>}
-            {mySongs && (
-              <button className="link-btn" onClick={() => onDeleteSong(selected)}>
-                Remove “{selected.title}” from My Songs
-              </button>
-            )}
-            {mic.status === 'listening' && !midi.listening && hasChords && (
-              <p className="small warn-text center">This level has chords — the microphone (beta) hears one note at a time. A MIDI piano works best here.</p>
-            )}
-          </div>}
-        </section>
-
-        <section className="card" aria-labelledby="input-heading">
-          <h2 id="input-heading">Connect</h2>
-          {nativeDevices.length > 0 && (
-            <p className="msg ok small">
-              <span className="status-dot ok" aria-hidden /> Connected through the app: {nativeDevices.join(', ')}
-            </p>
-          )}
-          <InputPanel
-            midi={midi}
-            mic={mic}
-            keyboardSimulator={settings.keyboardSimulator}
-            onKeyboardSimulatorChange={(v) => onSettingsChange({ keyboardSimulator: v })}
-          />
-
-          <details className="settings" open>
-            <summary>Sound</summary>
-            <label className="field">
-              <span>Piano sound</span>
-              <select value={settings.pianoOutput} onChange={(e) => onSettingsChange({ pianoOutput: e.target.value as PianoOutput })}>
-                <option value="auto">Auto — built-in unless a MIDI piano is connected</option>
-                <option value="physical">My piano makes the sound</option>
-                <option value="virtual">Built-in piano sound</option>
-              </select>
-              <small className="muted">The backing track never plays your melody (unless the melody guide or Listen is on), so nothing is doubled.</small>
-            </label>
-            <PianoSoundPicker value={settings.pianoSound} onChange={(pianoSound) => onSettingsChange({ pianoSound })} />
-            <Slider label="Backing track" value={settings.backingVolume} onChange={(v) => onSettingsChange({ backingVolume: v })} />
-            <Slider label="Built-in piano" value={settings.pianoVolume} onChange={(v) => onSettingsChange({ pianoVolume: v })} />
-            <Slider label="Clicks" value={settings.metronomeVolume} onChange={(v) => onSettingsChange({ metronomeVolume: v })} />
-            <Slider label="Sound effects" value={settings.effectsVolume} onChange={(v) => onSettingsChange({ effectsVolume: v })} />
-            <label className="toggle">
-              <input type="checkbox" checked={settings.metronome} onChange={(e) => onSettingsChange({ metronome: e.target.checked })} />
-              <span>Metronome click during songs</span>
-            </label>
-            {outputLatencyMs !== null && (
-              <p className={`small ${isHighLatency(outputLatencyMs / 1000) ? 'warn-text' : 'muted'}`}>
-                Audio output latency: {outputLatencyMs} ms
-                {isHighLatency(outputLatencyMs / 1000) ? ' — high (Bluetooth?). Wired headphones or speakers keep timing tight.' : ''}
-              </p>
-            )}
-          </details>
-
-          <details className="settings">
-            <summary>Timing &amp; display</summary>
-            <button className="btn btn-secondary btn-small" onClick={onCalibrate}>
-              Calibrate timing…
-            </button>
-            <label className="field">
-              <span>Timing windows (Discover &amp; Flow)</span>
-              <select
-                value={settings.timingPreset}
-                onChange={(e) => onSettingsChange({ timingPreset: e.target.value as TimingPreset })}
-              >
-                {(Object.keys(TIMING_PRESETS) as TimingPreset[]).map((k) => (
-                  <option key={k} value={k}>
-                    {TIMING_PRESETS[k].label} (Perfect ±{TIMING_PRESETS[k].windows.perfect} ms)
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>
-                Default input offset: <b>{settings.inputOffsetMs} ms</b>
-              </span>
-              <input
-                type="range"
-                min={-150}
-                max={150}
-                step={5}
-                value={settings.inputOffsetMs}
-                onChange={(e) => onSettingsChange({ inputOffsetMs: Number(e.target.value) })}
-              />
-              <small className="muted">Increase if hits are judged LATE even when they feel on time.</small>
-            </label>
-            <label className="toggle">
-              <input type="checkbox" checked={settings.showNoteLabels} onChange={(e) => onSettingsChange({ showNoteLabels: e.target.checked })} />
-              <span>Note letters on tiles</span>
-            </label>
-            <label className="toggle">
-              <input type="checkbox" checked={settings.showFingers} onChange={(e) => onSettingsChange({ showFingers: e.target.checked })} />
-              <span>Finger numbers on keys</span>
-            </label>
-            <label className="toggle">
-              <input type="checkbox" checked={settings.showKeyHints} onChange={(e) => onSettingsChange({ showKeyHints: e.target.checked })} />
-              <span>Show keyboard-key hints in game</span>
-            </label>
-            <label className="field">
-              <span>Visual effects</span>
-              <select value={settings.visualEffects} onChange={(e) => onSettingsChange({ visualEffects: e.target.value as VisualEffects })}>
-                <option value="full">Full</option>
-                <option value="reduced">Reduced (no particles or pulsing)</option>
-                <option value="minimal">Minimal (feedback only)</option>
-              </select>
-            </label>
-            {Object.keys(settings.calibrations).length > 0 && (
-              <div className="field">
-                <span>Calibrated devices</span>
-                <ul className="cal-list">
-                  {Object.entries(settings.calibrations).map(([key, ms]) => (
-                    <li key={key}>
-                      {describeConfig(key)}: <b>{ms} ms</b>{' '}
-                      <button
-                        className="link-btn inline"
-                        onClick={() => {
-                          const { [key]: _removed, ...rest } = settings.calibrations;
-                          onSettingsChange({ calibrations: rest });
-                        }}
-                      >
-                        reset
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </details>
-
-          <div className="home-links">
-            <button className="btn btn-ghost" onClick={onSetup}>
-              Setup guide
-            </button>
-            <button className="btn btn-ghost" onClick={onDiagnostics}>
-              MIDI diagnostics
-            </button>
-          </div>
-        </section>
-      </div>
+      {sheetOpen && levels.includes(selected) && (
+        <LevelSheet
+          level={selected}
+          look={look}
+          label={world.kind === 'path' ? `Level ${selected.number} · ${world.title}` : world.title}
+          progress={progress[selected.id]}
+          unlocked={open(selected)}
+          lockedText={lockedText}
+          hasInput={hasInput}
+          chordWarning={mic.status === 'listening' && !midi.listening && songFor(selected).events.some((e) => e.noteIds.length > 1)}
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+          onListen={onListen}
+          onPlay={onPlay}
+          onPracticeSection={onPracticeSection}
+          onConnect={onSettings}
+          onClose={() => setSheetOpen(false)}
+          onDelete={
+            mySongs
+              ? () => {
+                  setSheetOpen(false);
+                  onDeleteSong(selected);
+                }
+              : undefined
+          }
+        />
+      )}
     </main>
   );
 }
 
-/** "Practice a section": phrases with repeat labels; picking one loops it ×3 (unranked). */
-function SectionPractice({ level, disabled, onPick }: { level: LevelDefinition; disabled: boolean; onPick: (s: PracticeSection) => void }) {
-  const phrases = findPhrases(level.song).filter((p) => p.noteCount > 0);
-  const repeats = repeatedPatterns(level.song);
-  if (phrases.length < 2) return null;
+/** Colourful cover art for song cards, so a list of songs isn't a wall of one colour. */
+const SONG_ART: ReadonlyArray<{ emoji: string; from: string; to: string }> = [
+  { emoji: '🎤', from: '#ff6b3d', to: '#ff3d77' },
+  { emoji: '🦁', from: '#ffc93d', to: '#ff8a3d' },
+  { emoji: '🎶', from: '#4cc9f0', to: '#4361ee' },
+  { emoji: '🔔', from: '#3ddc84', to: '#1f9e8f' },
+  { emoji: '🎺', from: '#c86bfa', to: '#7b6cff' },
+  { emoji: '🌙', from: '#5e60ce', to: '#2a1d6e' },
+  { emoji: '🐑', from: '#ff8fab', to: '#f15bb5' },
+  { emoji: '⭐', from: '#ffd93d', to: '#f5a623' },
+  { emoji: '🌉', from: '#48cae4', to: '#0077b6' },
+  { emoji: '🎻', from: '#ff9f1c', to: '#e85d04' },
+  { emoji: '🎸', from: '#06d6a0', to: '#118ab2' },
+  { emoji: '🥁', from: '#ef476f', to: '#b5179e' },
+];
+
+/** "Artist" line for a song card: the composer credit, without boilerplate. */
+function songArtist(level: LevelDefinition): string {
+  return level.song.composer.replace(/^Music by /i, '');
+}
+
+/** What the game will listen to, as one friendly chip (tap → settings). */
+function InputChip({
+  midi,
+  mic,
+  nativeDevices,
+  keyboard,
+  onClick,
+}: {
+  midi: ReturnType<typeof useMidi>;
+  mic: MicState;
+  nativeDevices: readonly string[];
+  keyboard: boolean;
+  onClick: () => void;
+}) {
+  const device = midi.devices.find((d) => d.id === midi.selectedId);
+  const [icon, text, ok] = midi.listening
+    ? ['🎹', device?.name ?? 'Piano', true]
+    : nativeDevices.length > 0
+      ? ['🎹', nativeDevices[0]!, true]
+      : mic.status === 'listening'
+        ? ['🎤', 'Microphone', true]
+        : keyboard
+          ? ['⌨️', 'Computer keys', true]
+          : ['🔌', 'Connect a piano', false];
   return (
-    <details className="section-practice">
-      <summary>Practice a section</summary>
-      {repeats.length > 0 && (
-        <p className="small muted">
-          {repeats.map((r) => `Phrase ${r.label} appears ${r.occurrences.length}×`).join(' · ')} — learn it once, play it every time.
-        </p>
-      )}
-      <div className="section-list">
-        {phrases.map((p) => (
-          <button
-            key={p.index}
-            className="speed-option"
-            disabled={disabled}
-            onClick={() => onPick({ fromBeat: p.startBeat, toBeat: p.endBeat, firstBar: p.firstBar, lastBar: p.lastBar, repeats: 3 })}
-            aria-label={`Loop bars ${p.firstBar} to ${p.lastBar}, phrase ${p.label}, three times`}
-          >
-            Bars {p.firstBar}–{p.lastBar} <b>{p.label}</b>
-          </button>
-        ))}
-      </div>
-    </details>
+    <button className={`input-chip${ok ? '' : ' warn'}`} onClick={onClick} title="Change how you play">
+      <span aria-hidden>{icon}</span> <span className="input-chip-text">{text}</span>
+    </button>
   );
 }

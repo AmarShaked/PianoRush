@@ -83,14 +83,14 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] The level ends on its own and the results screen appears
 
 ## Levels, modes and progression (M2)
-- [ ] On a fresh profile only level 1 is playable. Other tiles show 🔒 and Play is disabled with an explanation
-- [ ] Finishing level 1 in Flow with ≥50% accuracy shows stars, "Level 2 unlocked!" and **Next level**
-- [ ] Finishing below 50% shows "Keep practising" and does not unlock anything
-- [ ] Stars and best scores appear on the level tiles, and the ★ total in the header adds up
+- [ ] On a fresh profile only level 1 is playable. Other stops on the map show 🔒; their card says which level to finish first and has no Learn/Play buttons (Listen still works)
+- [ ] Finishing level 1 in Play with ≥50% accuracy shows stars, "New level: …!" and **Next level ▶**
+- [ ] Finishing below 50% shows "Almost there!" and does not unlock anything
+- [ ] Stars appear under the stops on the map, the path is coloured up to the next level, and the ⭐ total in the top bar adds up
 - [ ] Reloading the page keeps the progress and selects the next unfinished level
-- [ ] **Discover:** the song stops with each tile on the line, shows "PLAY C4", and highlights the key. A wrong key flashes red and the song keeps waiting. The right key continues the song. The results show no stars
-- [ ] Pausing during a Discover wait and resuming goes straight back to waiting
-- [ ] **Challenge:** noticeably stricter (±40 ms Perfect). Completing it shows "🏆 Challenge cleared!" and a trophy on the tile
+- [ ] **🐢 Learn** (discover): the song stops with each tile on the line, shows "PLAY C4", and highlights the key. A wrong key flashes red and the song keeps waiting. The right key continues the song. The results show no stars
+- [ ] Pausing during a Learn wait and resuming goes straight back to waiting
+- [ ] **Challenge:** noticeably stricter (±40 ms Perfect). Completing it shows "🏆 Challenge cleared!" and a trophy on the stop
 - [ ] **Hold It (6):** holding long notes to the end shows "HOLD!". Releasing early shows "RELEASED EARLY" and the rest of the tile greys out. The results show "Long notes held x / y"
 - [ ] **Memory Challenge (9):** the second statement of each phrase disappears before the line. The first statement is fully visible
 - [ ] One-key and two-key levels (1, 2) lay out correctly with the MIDDLE C marker
@@ -117,9 +117,10 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] The backing harmonies sound right under each melody (no sour chords)
 
 ## Results
-- [ ] Score, stars, note accuracy, timing accuracy, Perfect/Great/Good/Miss counts, wrong notes and max combo are shown
-- [ ] "New best!" appears the first time, and the personal best appears later
-- [ ] **Play again** starts a new run without reloading. **Level select** returns to the home screen
+- [ ] A big cheer (Amazing! / Great job! / Well done! / Almost there! / Nice practice!), the stars and "You played X of Y notes right!" are shown
+- [ ] *See details* opens the score, note accuracy, timing accuracy, Perfect/Great/Good/Miss counts, wrong notes and max combo
+- [ ] "New best score" appears for a new best, and the previous best is in the details later
+- [ ] **↻ Again** starts a new run without reloading. **🏠 Home** returns to the map
 
 ## Performance and timing (real hardware)
 - [ ] With `?debug`, the FPS readout stays around 60 during play
@@ -131,15 +132,25 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] Resizing the window while playing re-lays out the lanes correctly
 - [ ] Phone portrait shows the "rotate your device" prompt
 
+## Kid-friendly menus
+- [ ] Home shows the world strip, the level map (or song cards for Hits / My Songs) and nothing else. The next level bounces with a **▶ Play** flag
+- [ ] Tapping a stop opens its card with the mini keyboard and the big **Listen / Learn / Play** buttons. ✕, Esc or tapping outside closes it
+- [ ] **⚙️ More** shows speed (Slow / Medium / Normal), the play-along helper and practice-a-part. Picking Slow or the helper makes Play say "Practice"
+- [ ] The top-bar chip shows the current input (piano name, computer keys, microphone) or a pulsing "Connect a piano"; tapping it or ⚙️ opens Settings, and **← Back** returns
+- [ ] With no input, the card shows "Connect your piano first — tap here" and Learn/Play are disabled
+- [ ] Calibration and MIDI diagnostics opened from Settings return to Settings
+- [ ] A phone in landscape (about 740×390): the map scrolls, and the level card fits with all three big buttons visible
+- [ ] My Songs shows an "Add a song" card that opens the importer
+
 ## Listen and melody guide
 - [ ] **👂 Listen** on Dance Monkey: the built-in piano plays the tune in time with the tiles reaching the line (no audible lag on your speakers), the keys light up, and the song returns to the menu at the end
 - [ ] Listen at 50% speed is slower and still in sync; pausing and resuming carries on cleanly
-- [ ] **🎹 Melody guide** in Flow: the guide is clearly softer than your own playing, sits in time with the band, and the results say "melody guide" with no stars
-- [ ] Melody guide in Discover: when the song stops to wait, the waited-for note sounds once, softly
-- [ ] On the level details, black-key lanes (e.g. Dance Monkey's F♯, G♯, C♯) are coloured on the mini keyboard
+- [ ] **🎹 Play-along helper** (melody guide) in Play: the guide is clearly softer than your own playing, sits in time with the band, and the results say to try it without the helper, with no stars
+- [ ] The helper in Learn: when the song stops to wait, the waited-for note sounds once, softly
+- [ ] On the level card, black-key lanes (e.g. Dance Monkey's F♯, G♯, C♯) are coloured on the mini keyboard
 
 ## Grand piano (sampled)
-- [ ] Settings → Sound → **▶ Try it** plays a grand piano chord. The note under it says "Downloading…", then "Grand piano ready"
+- [ ] ⚙️ Settings → Sound → **▶ Try it** plays a grand piano chord. The note under it says "Downloading…", then "Grand piano ready"
 - [ ] Soft and hard key presses on a MIDI keyboard sound different in tone (brighter when harder) as well as loudness, with no jumps between neighbouring velocities
 - [ ] Neighbouring keys across the whole range sound even in level and in tune
 - [ ] Repeated fast notes (trills) don't click, and releasing a key damps the note quickly
