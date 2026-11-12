@@ -146,6 +146,18 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] Connecting a MIDI keyboard for the first time (Sound on Auto) asks "Can you hear it?". **No sound** makes your keys play the game's piano on the home and Settings screens and in songs; **Yes** keeps the game's piano silent. The question doesn't come back after reloading
 - [ ] The **🔊 Game piano** button in the top bar (only while a MIDI keyboard is connected) switches the game's piano on and off, and Settings → Sound shows the same choice
 
+## Loop Studio
+- [ ] **🔁 Loop Studio** opens from the home screen's world list; **← Home** returns
+- [ ] With a MIDI keyboard: every instrument sounds when you play, and keys released stop sustained sounds (bass, pad, lead). The piano responds to the sustain pedal
+- [ ] Drums: C kick, D snare, F♯ hi-hat etc. in any octave. Pads on channel 10 play drums while the keys are set to Bass
+- [ ] Tap slot 1 (stopped): one bar of count-in clicks, "● Rec", then the loop plays back after 2 bars, in time with the click. The pass you played isn't doubled
+- [ ] Tap slot 2 while slot 1 plays: it waits for the next bar ("Starts in 3…"), records, and plays in step with slot 1
+- [ ] ∞ Free: tap again to finish; the loop length rounds to the nearest bar. Tapping another slot while recording chains straight into it
+- [ ] Tap a playing loop: muted / unmuted. ➕ adds a layer for one pass, ↶ removes it, 🗑 deletes the loop
+- [ ] Changing the tempo while playing doesn't jump; tap tempo works after 3 taps. Snap 1/16 tidies sloppy timing; Off keeps it as played
+- [ ] Keys 1–8 tap the slots and Enter plays/stops (computer keyboard)
+- [ ] Leaving and coming back (or reloading) keeps the loops; ▶ plays them from the top
+
 ## Listen and melody guide
 - [ ] **👂 Listen** on Dance Monkey: the built-in piano plays the tune in time with the tiles reaching the line (no audible lag on your speakers), the keys light up, and the song returns to the menu at the end
 - [ ] Listen at 50% speed is slower and still in sync; pausing and resuming carries on cleanly

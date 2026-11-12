@@ -137,6 +137,40 @@ export function openHat(ctx: BaseAudioContext, out: AudioNode, t: number, vel: n
   return voice(g, [src], t + 0.24);
 }
 
+/** Tom: a pitched drum with a falling pitch (MIDI note sets the size: 45 low, 50 mid, 55 high). */
+export function tom(ctx: BaseAudioContext, out: AudioNode, t: number, midi: number, vel: number): Voice {
+  const g = envGain(ctx, out);
+  const osc = ctx.createOscillator();
+  const f = midiToHz(midi);
+  osc.frequency.setValueAtTime(f * 1.6, t);
+  osc.frequency.exponentialRampToValueAtTime(f, t + 0.08);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vel * 0.75, t + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+  osc.connect(g);
+  osc.start(t);
+  return voice(g, [osc], t + 0.47);
+}
+
+/** Rim click / side stick: a short, woody knock. */
+export function rim(ctx: BaseAudioContext, out: AudioNode, t: number, vel: number): Voice {
+  const g = envGain(ctx, out);
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 1800;
+  bp.Q.value = 3;
+  bp.connect(g);
+  const osc = ctx.createOscillator();
+  osc.type = 'square';
+  osc.frequency.value = 820;
+  osc.connect(bp);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vel * 0.6, t + 0.001);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  osc.start(t);
+  return voice(g, [osc], t + 0.07);
+}
+
 export function crash(ctx: BaseAudioContext, out: AudioNode, t: number, vel: number): Voice {
   const g = envGain(ctx, out);
   const src = ctx.createBufferSource();

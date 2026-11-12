@@ -1,8 +1,8 @@
-import type { BackingNote } from './arranger';
+import type { BackingNote, BackingPart } from './arranger';
 import { ClockSync } from './ClockSync';
 import { SampledPiano } from './SampledPiano';
 import { PianoKeys } from './sustain';
-import { bass, clap, click, crash, effect, hat, keys, kick, lead, openHat, pad, piano, snare, synthBass, type EffectKind, type Voice } from './synth';
+import { bass, clap, click, crash, effect, hat, keys, kick, lead, openHat, pad, piano, rim, snare, synthBass, tom, type EffectKind, type Voice } from './synth';
 
 export interface Volumes {
   /** 0..1 */
@@ -118,6 +118,11 @@ export class AudioEngine {
     return { base: this.ctx.baseLatency ?? 0, output: typeof output === 'number' && output > 0 ? output : null };
   }
 
+  /** Current audio-context time (s), for stopping live voices; 0 before audio starts. */
+  get now(): number {
+    return this.ctx?.currentTime ?? 0;
+  }
+
   /** Total latency used to size the scheduling lookahead (s). */
   get totalLatency(): number {
     const l = this.latency;
@@ -159,6 +164,12 @@ export class AudioEngine {
       case 'crash':
         voice = crash(ctx, out, t, v);
         break;
+      case 'tom':
+        voice = tom(ctx, out, t, note.midi ?? 50, v);
+        break;
+      case 'rim':
+        voice = rim(ctx, out, t, v);
+        break;
       case 'synthbass':
         voice = synthBass(ctx, out, t, note.midi ?? 36, durationSec, v);
         break;
@@ -186,6 +197,34 @@ export class AudioEngine {
     }
     this.track(voice);
     this.scheduledCount++;
+  }
+
+  /**
+   * Live playing (the Loop Studio): start an instrument note now. Sustained
+   * instruments return a voice that keeps sounding until you stop it (key up);
+   * drums are one-shots and return null. The piano uses pianoNoteOn / Off.
+   */
+  liveNote(part: BackingPart, midi: number | undefined, velocity: number): Voice | null {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') return null;
+    const t = ctx.currentTime;
+    const out = this.buses.backing;
+    const held = 8; // seconds; the key-up stops it long before
+    switch (part) {
+      case 'bass':
+        return bass(ctx, out, t, midi ?? 36, held, velocity);
+      case 'synthbass':
+        return synthBass(ctx, out, t, midi ?? 36, held, velocity);
+      case 'pad':
+        return pad(ctx, out, t, midi ?? 48, held, velocity);
+      case 'keys':
+        return keys(ctx, out, t, midi ?? 60, held, velocity);
+      case 'lead':
+        return lead(ctx, out, t, midi ?? 72, held, velocity);
+      default:
+        this.playBacking({ part, beat: 0, durationBeats: 0, velocity, midi }, t, 0.3);
+        return null;
+    }
   }
 
   /** Decode an encoded audio file (mp3 / wav / ogg / m4a) for a recorded backing track. */

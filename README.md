@@ -6,6 +6,7 @@ The full product described in the PRD is implemented:
 - **Six learning worlds, 60 levels:** from one key, through rhythm, range and black keys, then the left hand and chords, to two hands.
 - **15 famous public-domain songs** for free play.
 - **Three modes:** Learn (the song waits for you), Play and Challenge.
+- **🔁 Loop Studio:** a live MIDI looper. Play drums, bass, piano, keys, pad or lead on your keyboard and build a song out of loops.
 - **Kid-friendly menus:** a level map with big buttons; settings stay behind ⚙️.
 - **Input:** MIDI, the computer keyboard, and microphone input (beta) for acoustic pianos.
 - **Audio:** synchronized, generated backing tracks and a built-in piano sound.
@@ -54,6 +55,21 @@ The menus are made for kids: big buttons, few words, one choice at a time.
 - **Top bar:** a chip shows what the game listens to (🎹 your piano, ⌨️ computer keys, 🎤 microphone, or 🔌 *Connect a piano*); tap it or **⚙️** for **Settings**: connecting, sound, display, timing, the setup guide and MIDI diagnostics.
 - **Desktop** (a wide screen with a mouse): the worlds are listed down the left, the map is in the middle, and the selected level's card stays open on the right, so one click picks a level and one more plays it. **← →** pick a level and **↑ ↓** change world. Phones and tablets use the pop-up card.
 - **Results:** a big cheer, your stars, "You played 18 of 20 notes right!", and **Next level ▶ / ↻ Again / 🏠 Home**. Scores and timing stats are under *See details*.
+
+## Loop Studio
+
+Open **🔁 Loop Studio** from the world list on the home screen. It's a live looper for your MIDI keyboard (or the computer keys): play, record a loop, and keep layering on top while everything plays in time.
+
+- **Your keys play** the instrument you pick: 🥁 Drums, 🎸 Bass (sounds an octave down), 🎹 Piano (the grand piano, with the sustain pedal), ✨ Keys, 🌌 Pad or 🎺 Lead.
+  - **Drums** follow the note name, so they work in every octave: C kick, C♯ rim, D snare, D♯ clap, E snare, F/G/A toms, F♯/G♯ hi-hat, A♯ open hat, B crash.
+  - **Drum pads** that send on MIDI channel 10 (most mini keyboards' pads, e.g. M-VAVE) always play drums, whatever the keys are set to. So you can drum on the pads and play bass on the keys.
+- **8 loop slots.** Tap an empty slot (or press **1–8**) to record:
+  - Recording starts on the next bar line. If nothing is playing yet, you get a one-bar count-in first.
+  - It stops by itself after the loop length you chose (**1, 2, 4 or 8 bars**). With **∞ Free**, tap again to finish; the loop closes on the nearest bar line.
+  - Tapping another empty slot while one is recording finishes the first and starts the next right after it, so you can chain loops without stopping.
+  - Tap a playing loop to **mute / unmute** it. On each loop: **➕** adds a layer (records for one pass), **↶** undoes the last layer, **🗑** deletes it.
+- **In time:** tempo (− / + / type it / 👆 tap tempo), click on or off, and **Snap** (1/16, 1/8 or off) to tidy your timing. Notes you play are heard live and join the loop from its next pass. **▶ / ■** (or **Enter**) starts and stops everything; ▶ starts every loop from the top.
+- Your loops are saved in this browser and come back next time.
 
 ## Playing
 

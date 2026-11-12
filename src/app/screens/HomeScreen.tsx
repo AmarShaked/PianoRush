@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { isPlayable, songFor, type PracticeSection } from '../catalog';
 import type { GameMode, LevelDefinition, WorldDefinition } from '../../song-content/level';
 import { totalStars, type ProgressMap } from '../../game-engine/progression';
@@ -27,6 +27,8 @@ interface HomeScreenProps {
   onListen: () => void;
   onPracticeSection: (section: PracticeSection) => void;
   onSettings: () => void;
+  /** Open the Loop Studio. */
+  onLooper: () => void;
   /** The game's piano sounds your keys (see Settings → Sound). */
   builtInPiano: boolean;
   onBuiltInPianoChange: (on: boolean) => void;
@@ -46,7 +48,7 @@ interface HomeScreenProps {
  */
 export function HomeScreen(props: HomeScreenProps) {
   const { mic, nativeDevices, collections, world: selectedWorld, progress, selected, onSelect, midi, settings, onSettingsChange } = props;
-  const { onPlay, onListen, onPracticeSection, onSettings, onImport, onDeleteSong, builtInPiano, onBuiltInPianoChange, askPianoSound } = props;
+  const { onPlay, onListen, onPracticeSection, onSettings, onLooper, onImport, onDeleteSong, builtInPiano, onBuiltInPianoChange, askPianoSound } = props;
   const externalPiano = midi.listening || nativeDevices.length > 0;
   // A collection with no songs yet (an empty "My Songs") can still be opened.
   const [emptyTab, setEmptyTab] = useState<WorldDefinition | null>(null);
@@ -195,7 +197,14 @@ export function HomeScreen(props: HomeScreenProps) {
               </button>
             );
           })}
-        </nav>
+          <button className="world-chip studio-chip" onClick={onLooper} style={{ '--world': '#ff3dbb', '--world-shade': '#b0167f' } as CSSProperties}>
+          <span className="world-emoji" aria-hidden>
+            🔁
+          </span>
+          <span className="world-name">Loop Studio</span>
+          <span className="world-stars">Make music live</span>
+        </button>
+      </nav>
 
         <section className="world-stage" style={lookStyle(look)} aria-label={world.title}>
           {world.kind === 'path' ? (

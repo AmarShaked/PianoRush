@@ -2,7 +2,7 @@ import { chordAt, parseChord, type Chord } from '../song-content/chords';
 import type { CompiledSong } from '../song-content/compile';
 import type { BackingStyle } from '../song-content/schema';
 
-export type BackingPart = 'kick' | 'snare' | 'clap' | 'hat' | 'openhat' | 'crash' | 'bass' | 'synthbass' | 'pad' | 'keys' | 'lead' | 'melody' | 'click';
+export type BackingPart = 'kick' | 'snare' | 'clap' | 'hat' | 'openhat' | 'crash' | 'tom' | 'rim' | 'bass' | 'synthbass' | 'pad' | 'keys' | 'lead' | 'melody' | 'click';
 
 /** One accompaniment event in musical time. Pitched parts carry a MIDI note. */
 export interface BackingNote {

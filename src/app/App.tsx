@@ -25,6 +25,7 @@ import { DiagnosticsScreen } from './screens/DiagnosticsScreen';
 import { CalibrationScreen } from './screens/CalibrationScreen';
 import { SetupScreen, type SetupStep } from './screens/SetupScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { LooperScreen } from './screens/LooperScreen';
 
 const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator, microphoneInput, nativeMidi];
 
@@ -33,6 +34,9 @@ function builtInPianoOn(settings: Settings): boolean {
   if (settings.pianoOutput !== 'auto') return settings.pianoOutput === 'virtual';
   return !midiManager.isListening && !nativeMidi.isActive && microphoneInput.status !== 'listening';
 }
+
+/** The Loop Studio plays what you play: MIDI, native MIDI and the computer keyboard (not the one-note microphone). */
+const LOOPER_INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator, nativeMidi];
 
 /** Screens where your keys just play the piano (free play between songs). */
 const FREE_PLAY_SCREENS: ReadonlySet<string> = new Set(['home', 'settings', 'results', 'diagnostics']);
@@ -66,6 +70,7 @@ type Screen =
       readonly update: ProgressUpdate;
     }
   | { readonly name: 'settings' }
+  | { readonly name: 'looper' }
   | { readonly name: 'diagnostics' }
   | { readonly name: 'calibration'; readonly returnTo: 'settings' | 'setup' }
   | { readonly name: 'import' }
@@ -113,7 +118,7 @@ export function App() {
   }, [midi.selectedId, settings.lastMidiDeviceId, updateSettings]);
 
   // The keyboard simulator only listens while a level is on screen.
-  const gameSimEnabled = screen.name === 'game' && screen.settings.keyboardSimulator;
+  const gameSimEnabled = (screen.name === 'game' && screen.settings.keyboardSimulator) || (screen.name === 'looper' && settings.keyboardSimulator);
   useEffect(() => {
     if (!gameSimEnabled) return;
     keyboardSimulator.enable();
@@ -250,6 +255,16 @@ export function App() {
           onBack={toSettings}
         />
       );
+    case 'looper':
+      return (
+        <LooperScreen
+          inputs={LOOPER_INPUTS}
+          settings={settings}
+          deviceName={midi.listening ? (midi.devices.find((d) => d.id === midi.selectedId)?.name ?? 'MIDI keyboard') : (nativeDevices[0] ?? null)}
+          onBack={toHome}
+          onSettings={toSettings}
+        />
+      );
     case 'settings':
       return (
         <SettingsScreen
@@ -334,6 +349,10 @@ export function App() {
           onListen={() => startLevel(selected, 'flow', settings.practiceSpeed, null, { listen: true })}
           onPracticeSection={(section) => startLevel(selected, settings.preferredMode, settings.practiceSpeed, section)}
           onSettings={toSettings}
+          onLooper={() => {
+            audioEngine.unlock();
+            setScreen({ name: 'looper' });
+          }}
           builtInPiano={builtInPiano}
           onBuiltInPianoChange={(on) => {
             audioEngine.unlock();
