@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isPlayable, songFor, type PracticeSection } from '../catalog';
 import type { GameMode, LevelDefinition, WorldDefinition } from '../../song-content/level';
 import { totalStars, type ProgressMap } from '../../game-engine/progression';
@@ -35,6 +35,9 @@ interface HomeScreenProps {
  * Level select, made for kids: pick a world at the top, tap a stop on the
  * path (or a song card), then Listen / Learn / Play in the card that opens.
  * Everything else lives behind the ⚙️ button.
+ *
+ * On a desktop (wide screen and a mouse) the worlds become a sidebar and the
+ * level card stays open on the right, so one click picks a level.
  */
 export function HomeScreen(props: HomeScreenProps) {
   const { mic, nativeDevices, collections, world: selectedWorld, progress, selected, onSelect, midi, settings, onSettingsChange } = props;
@@ -42,6 +45,7 @@ export function HomeScreen(props: HomeScreenProps) {
   // A collection with no songs yet (an empty "My Songs") can still be opened.
   const [emptyTab, setEmptyTab] = useState<WorldDefinition | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const desktop = useMediaQuery(DESKTOP_QUERY);
   const world = emptyTab ?? selectedWorld;
   const look = worldLook(world);
   const levels = world.levels;
@@ -55,8 +59,40 @@ export function HomeScreen(props: HomeScreenProps) {
   const pick = (level: LevelDefinition) => {
     setEmptyTab(null);
     onSelect(level);
-    setSheetOpen(true);
+    if (!desktop) setSheetOpen(true);
   };
+  const selectWorld = (c: WorldDefinition) => {
+    if (c === world) return;
+    if (c.levels.length === 0) {
+      setEmptyTab(c);
+      return;
+    }
+    setEmptyTab(null);
+    // Jump to the first open, unfinished entry of that collection.
+    const first = c.levels.find((l) => open(l) && !progress[l.id]?.completed);
+    onSelect(first ?? c.levels[0]!);
+  };
+
+  // Desktop: ← → pick the level, ↑ ↓ the world.
+  useEffect(() => {
+    if (!desktop) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || (e.target as HTMLElement | null)?.closest('input, select, textarea')) return;
+      const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -1, ArrowDown: 1 }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const i = levels.indexOf(selected);
+        const next = levels[Math.max(0, Math.min(levels.length - 1, i < 0 ? 0 : i + step))];
+        if (next) pick(next);
+      } else {
+        const next = collections[collections.indexOf(world) + step];
+        if (next) selectWorld(next);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   const selectedIndex = levels.indexOf(selected);
   const previous = selectedIndex > 0 ? levels[selectedIndex - 1] : null;
@@ -65,8 +101,37 @@ export function HomeScreen(props: HomeScreenProps) {
       ? `Finish the last level of the world before to open this one!`
       : `Finish “${previous?.title ?? 'the level before'}” to open this level!`;
 
+  const renderSheet = (docked: boolean) => (
+    <LevelSheet
+      docked={docked}
+      level={selected}
+      look={look}
+      label={world.kind === 'path' ? `Level ${selected.number} · ${world.title}` : world.title}
+      progress={progress[selected.id]}
+      unlocked={open(selected)}
+      lockedText={lockedText}
+      hasInput={hasInput}
+      chordWarning={mic.status === 'listening' && !midi.listening && songFor(selected).events.some((e) => e.noteIds.length > 1)}
+      settings={settings}
+      onSettingsChange={onSettingsChange}
+      onListen={onListen}
+      onPlay={onPlay}
+      onPracticeSection={onPracticeSection}
+      onConnect={onSettings}
+      onClose={() => setSheetOpen(false)}
+      onDelete={
+        mySongs
+          ? () => {
+              setSheetOpen(false);
+              onDeleteSong(selected);
+            }
+          : undefined
+      }
+    />
+  );
+
   return (
-    <main className="screen home-screen">
+    <main className={`screen home-screen${desktop ? ' desktop' : ''}`}>
       <header className="top-bar">
         <h1 className="logo">
           Piano<span>Rush</span>
@@ -82,103 +147,106 @@ export function HomeScreen(props: HomeScreenProps) {
         </div>
       </header>
 
-      <nav className="world-strip" aria-label="Worlds">
-        {collections.map((c) => {
-          const cl = worldLook(c);
-          const active = c === world;
-          const stars = c.kind === 'path' ? totalStars(c.levels, progress) : null;
-          const lockedWorld = c.kind === 'path' && c.levels.length > 0 && !open(c.levels[0]!);
-          return (
-            <button
-              key={c.id}
-              className={`world-chip${active ? ' active' : ''}${lockedWorld ? ' locked' : ''}`}
-              style={lookStyle(cl)}
-              aria-pressed={active}
-              onClick={() => {
-                if (active) return;
-                if (c.levels.length === 0) {
-                  setEmptyTab(c);
-                  return;
-                }
-                setEmptyTab(null);
-                // Jump to the first open, unfinished entry of that collection.
-                const first = c.levels.find((l) => open(l) && !progress[l.id]?.completed);
-                onSelect(first ?? c.levels[0]!);
-              }}
-            >
-              <span className="world-emoji" aria-hidden>
-                {lockedWorld ? '🔒' : cl.emoji}
-              </span>
-              <span className="world-name">{c.title}</span>
-              {stars !== null && <span className="world-stars">⭐ {stars}/{c.levels.length * 3}</span>}
-            </button>
-          );
-        })}
-      </nav>
-
-      <section className="world-stage" style={lookStyle(look)} aria-label={world.title}>
-        {world.kind === 'path' ? (
-          <LevelMap levels={levels} progress={progress} isOpen={open} current={current} onPick={pick} />
-        ) : (
-          <ul className="song-grid">
-            {mySongs && (
-              <li>
-                <button className="song-card add-song" onClick={onImport}>
-                  <span className="song-art" aria-hidden>
-                    ＋
+      <div className="home-body">
+        <nav className="world-strip" aria-label="Worlds">
+          {collections.map((c) => {
+            const cl = worldLook(c);
+            const active = c === world;
+            const stars = c.kind === 'path' ? totalStars(c.levels, progress) : null;
+            const lockedWorld = c.kind === 'path' && c.levels.length > 0 && !open(c.levels[0]!);
+            return (
+              <button
+                key={c.id}
+                className={`world-chip${active ? ' active' : ''}${lockedWorld ? ' locked' : ''}`}
+                style={lookStyle(cl)}
+                aria-pressed={active}
+                onClick={() => selectWorld(c)}
+              >
+                <span className="world-emoji" aria-hidden>
+                  {lockedWorld ? '🔒' : cl.emoji}
+                </span>
+                <span className="world-name">{c.title}</span>
+                {stars !== null && (
+                  <span className="world-stars">
+                    ⭐ {stars}/{c.levels.length * 3}
                   </span>
-                  <span className="song-title">Add a song</span>
-                  <span className="song-artist">from a MIDI file</span>
-                </button>
-              </li>
-            )}
-            {levels.map((level, i) => {
-              const lp = progress[level.id];
-              const art = SONG_ART[i % SONG_ART.length]!;
-              return (
-                <li key={level.id}>
-                  <button className="song-card" onClick={() => pick(level)}>
-                    <span className="song-art" aria-hidden style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
-                      {art.emoji}
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        <section className="world-stage" style={lookStyle(look)} aria-label={world.title}>
+          {world.kind === 'path' ? (
+            <LevelMap
+              levels={levels}
+              progress={progress}
+              isOpen={open}
+              current={current}
+              selected={desktop ? selected : null}
+              onPick={pick}
+            />
+          ) : (
+            <ul className="song-grid">
+              {mySongs && (
+                <li>
+                  <button className="song-card add-song" onClick={onImport}>
+                    <span className="song-art" aria-hidden>
+                      ＋
                     </span>
-                    <span className="song-title">{level.title}</span>
-                    <span className="song-artist">{songArtist(level)}</span>
-                    <Stars count={lp?.bestStars ?? 0} small />
+                    <span className="song-title">Add a song</span>
+                    <span className="song-artist">from a MIDI file</span>
                   </button>
                 </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+              )}
+              {levels.map((level, i) => {
+                const lp = progress[level.id];
+                const art = SONG_ART[i % SONG_ART.length]!;
+                return (
+                  <li key={level.id}>
+                    <button
+                      className={`song-card${desktop && level === selected ? ' selected' : ''}`}
+                      onClick={() => pick(level)}
+                      aria-pressed={desktop ? level === selected : undefined}
+                    >
+                      <span className="song-art" aria-hidden style={{ background: `linear-gradient(135deg, ${art.from}, ${art.to})` }}>
+                        {art.emoji}
+                      </span>
+                      <span className="song-title">{level.title}</span>
+                      <span className="song-artist">{songArtist(level)}</span>
+                      <Stars count={lp?.bestStars ?? 0} small />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
-      {sheetOpen && levels.includes(selected) && (
-        <LevelSheet
-          level={selected}
-          look={look}
-          label={world.kind === 'path' ? `Level ${selected.number} · ${world.title}` : world.title}
-          progress={progress[selected.id]}
-          unlocked={open(selected)}
-          lockedText={lockedText}
-          hasInput={hasInput}
-          chordWarning={mic.status === 'listening' && !midi.listening && songFor(selected).events.some((e) => e.noteIds.length > 1)}
-          settings={settings}
-          onSettingsChange={onSettingsChange}
-          onListen={onListen}
-          onPlay={onPlay}
-          onPracticeSection={onPracticeSection}
-          onConnect={onSettings}
-          onClose={() => setSheetOpen(false)}
-          onDelete={
-            mySongs
-              ? () => {
-                  setSheetOpen(false);
-                  onDeleteSong(selected);
-                }
-              : undefined
-          }
-        />
-      )}
+        {desktop && (
+          <aside className="level-panel" aria-label="Selected level">
+            {levels.includes(selected) ? (
+              <>
+                {renderSheet(true)}
+                <p className="key-hint">Tip: ← → pick a level · ↑ ↓ change world</p>
+              </>
+            ) : (
+              <div className="sheet docked panel-empty" style={lookStyle(look)}>
+                <div className="cheer-emoji" aria-hidden>
+                  🎵
+                </div>
+                <h2>Your own songs</h2>
+                <p className="muted">Add a song from a MIDI file. It stays in this browser.</p>
+                <button className="btn btn-primary" onClick={onImport}>
+                  ＋ Add a song
+                </button>
+              </div>
+            )}
+          </aside>
+        )}
+      </div>
+
+      {!desktop && sheetOpen && levels.includes(selected) && renderSheet(false)}
     </main>
   );
 }
@@ -233,4 +301,31 @@ function InputChip({
       <span aria-hidden>{icon}</span> <span className="input-chip-text">{text}</span>
     </button>
   );
+}
+
+/** Wide screen with a mouse: sidebar + map + docked level card. Phones and tablets keep the pop-up card. */
+const DESKTOP_QUERY = '(min-width: 1100px) and (hover: hover) and (pointer: fine)';
+
+function useMediaQuery(query: string): boolean {
+  const get = () => {
+    try {
+      return window.matchMedia(query).matches;
+    } catch {
+      return false;
+    }
+  };
+  const [matches, setMatches] = useState(get);
+  useEffect(() => {
+    let mql: MediaQueryList;
+    try {
+      mql = window.matchMedia(query);
+    } catch {
+      return;
+    }
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, [query]);
+  return matches;
 }

@@ -8,6 +8,8 @@ interface LevelMapProps {
   isOpen: (level: LevelDefinition) => boolean;
   /** The level to play next (gets the "you are here" marker). */
   current: LevelDefinition | null;
+  /** Highlighted level (desktop, where the level card stays open beside the map). */
+  selected?: LevelDefinition | null;
   onPick: (level: LevelDefinition) => void;
 }
 
@@ -19,7 +21,7 @@ const ROW_H = 125;
  * A world's levels as a winding path of big round stops, like a board game:
  * left to right, then back right to left on the next row.
  */
-export function LevelMap({ levels, progress, isOpen, current, onPick }: LevelMapProps) {
+export function LevelMap({ levels, progress, isOpen, current, selected = null, onPick }: LevelMapProps) {
   const rows = Math.ceil(levels.length / COLS);
   const width = COLS * COL_W;
   const height = rows * ROW_H;
@@ -36,7 +38,10 @@ export function LevelMap({ levels, progress, isOpen, current, onPick }: LevelMap
   const travelled = doneUpTo > 0 ? pathThrough(points.slice(0, doneUpTo + 1), width) : '';
 
   return (
-    <div className="level-map" style={{ aspectRatio: `${width} / ${height}`, maxWidth: `max(560px, calc((100dvh - 250px) * ${width / height}))` }}>
+    <div
+      className="level-map"
+      style={{ aspectRatio: `${width} / ${height}`, maxWidth: `max(520px, calc((100dvh - var(--map-chrome, 250px)) * ${width / height}))` }}
+    >
       <svg className="level-map-path" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden>
         <path d={track} className="path-track" />
         {travelled && <path d={travelled} className="path-done" />}
@@ -51,7 +56,8 @@ export function LevelMap({ levels, progress, isOpen, current, onPick }: LevelMap
           return (
             <li key={level.id} style={{ left: `${(p.x / width) * 100}%`, top: `${(p.y / height) * 100}%` }}>
               <button
-                className={`stop${done ? ' done' : ''}${open ? '' : ' locked'}${here ? ' here' : ''}`}
+                className={`stop${done ? ' done' : ''}${open ? '' : ' locked'}${here ? ' here' : ''}${level === selected ? ' selected' : ''}`}
+                aria-pressed={selected ? level === selected : undefined}
                 onClick={() => onPick(level)}
                 aria-label={`Level ${level.number}: ${level.title}${open ? `, ${lp?.bestStars ?? 0} stars` : ', locked'}`}
               >

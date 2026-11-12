@@ -52,6 +52,7 @@ The menus are made for kids: big buttons, few words, one choice at a time.
 - **Home:** pick a world from the coloured strip at the top. Learning worlds are a winding **level map** of big numbered stops; the next one to play bounces with a **▶ Play** flag, finished ones show their stars, locked ones a 🔒. Hits and My Songs are a grid of colourful song cards.
 - **Level card:** tap a stop or a song to open it. It shows the keys on a small piano and three big buttons: **👂 Listen**, **🐢 Learn** and **▶ Play**, plus **🏆 Challenge** and **⚙️ More** (speed, the play-along helper, practice a part).
 - **Top bar:** a chip shows what the game listens to (🎹 your piano, ⌨️ computer keys, 🎤 microphone, or 🔌 *Connect a piano*); tap it or **⚙️** for **Settings**: connecting, sound, display, timing, the setup guide and MIDI diagnostics.
+- **Desktop** (a wide screen with a mouse): the worlds are listed down the left, the map is in the middle, and the selected level's card stays open on the right, so one click picks a level and one more plays it. **← →** pick a level and **↑ ↓** change world. Phones and tablets use the pop-up card.
 - **Results:** a big cheer, your stars, "You played 18 of 20 notes right!", and **Next level ▶ / ↻ Again / 🏠 Home**. Scores and timing stats are under *See details*.
 
 ## Playing
