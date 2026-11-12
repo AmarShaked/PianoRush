@@ -544,3 +544,13 @@ kbd {
 .key-hint { font-size: 0.8rem; color: var(--muted); text-align: center; margin: 10px 0 0; }
 .sheet.docked .option-label { width: 100%; min-width: 0; }
 .sheet.docked .pill { padding: 7px 12px; font-size: 0.9rem; }
+
+/* Game-piano switch (shown while a MIDI keyboard is connected) and the "can you hear it?" question */
+.sound-toggle {
+  font: inherit; font-weight: 800; color: var(--muted); background: rgba(255, 255, 255, 0.08); border: 2px solid var(--panel-border);
+  border-radius: 999px; padding: 8px 14px; cursor: pointer; white-space: nowrap;
+}
+.sound-toggle.on { color: var(--text); background: rgba(76, 201, 240, 0.2); border-color: rgba(76, 201, 240, 0.7); }
+.ask-sound { width: min(560px, 100%); text-align: center; }
+.ask-sound .big-actions { grid-template-columns: 1fr 1fr; }
+@media (max-width: 720px) { .sound-toggle-text { display: none; } }

@@ -128,6 +128,7 @@ Check that your license covers this use. ACUM mainly licenses performance of the
     - **Light synth piano:** no download.
   - **Sustain pedal:** a MIDI sustain pedal (CC64), or holding Space on the computer keyboard, keeps the built-in piano's notes ringing after you let go of the keys, like a real damper pedal. It only changes the sound. Scoring still follows your keys, so long notes must still be held down with your finger. With a piano that makes its own sound, the pedal works on your piano as usual.
   - **Auto:** built-in only when nothing else makes sound.
+  - **MIDI keyboards without speakers:** the first time a MIDI keyboard connects, the game asks "Press a key. Can you hear it?". Answering **No sound** turns on the game's piano. While a MIDI keyboard is connected, the **🔊 Game piano ON / 🔇 OFF** button in the top bar switches it at any time. With the game's piano on, your keys (and sustain pedal) make sound on the menus too, not only during songs.
 - **Volumes.** Backing, built-in piano, clicks and **sound effects** each have a slider. There are 4 count-in clicks, plus an optional metronome.
 - **Calibration** (⚙️ Settings → Timing):
   - Tap along to 12 clicks; the median offset becomes the input offset, **saved per device configuration** (input device × wired/wireless audio).

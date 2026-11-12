@@ -143,6 +143,8 @@ Record the browser, OS, piano model and connection type for each run. Tick only 
 - [ ] My Songs shows an "Add a song" card that opens the importer
 - [ ] **Desktop** (≥ 1100 px wide, mouse): worlds are a sidebar with Hits and My Songs always visible, and the level card is docked on the right with its options open. Clicking a stop or song only updates the card (no pop-up); the selected one has a yellow ring. **← →** move between levels and **↑ ↓** between worlds
 - [ ] An iPad or phone still gets the world strip and the pop-up card
+- [ ] Connecting a MIDI keyboard for the first time (Sound on Auto) asks "Can you hear it?". **No sound** makes your keys play the game's piano on the home and Settings screens and in songs; **Yes** keeps the game's piano silent. The question doesn't come back after reloading
+- [ ] The **🔊 Game piano** button in the top bar (only while a MIDI keyboard is connected) switches the game's piano on and off, and Settings → Sound shows the same choice
 
 ## Listen and melody guide
 - [ ] **👂 Listen** on Dance Monkey: the built-in piano plays the tune in time with the tiles reaching the line (no audible lag on your speakers), the keys light up, and the song returns to the menu at the end

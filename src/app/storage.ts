@@ -40,6 +40,8 @@ export interface Settings {
   showFingers: boolean;
   /** First-launch setup completed (or skipped). */
   onboarded: boolean;
+  /** We asked whether the connected MIDI keyboard makes its own sound. */
+  pianoSoundAsked: boolean;
 }
 
 export type PianoOutput = 'auto' | 'physical' | 'virtual';
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showFingers: true,
   melodyGuide: false,
   onboarded: false,
+  pianoSoundAsked: false,
 };
 
 function read(): Stored {

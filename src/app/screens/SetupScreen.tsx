@@ -316,7 +316,7 @@ function SoundStep({
         <button
           className="btn btn-primary"
           onClick={() => {
-            onSettingsChange({ pianoOutput: choice });
+            onSettingsChange({ pianoOutput: choice, pianoSoundAsked: true });
             audioEngine.stopBacking();
             onContinue();
           }}

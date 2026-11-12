@@ -27,6 +27,15 @@ import { SetupScreen, type SetupStep } from './screens/SetupScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 
 const INPUTS: readonly PianoInputSource[] = [midiManager, keyboardSimulator, microphoneInput, nativeMidi];
+
+/** Does the game's built-in piano sound your keys? Auto: only when nothing else makes sound (never over an acoustic piano). */
+function builtInPianoOn(settings: Settings): boolean {
+  if (settings.pianoOutput !== 'auto') return settings.pianoOutput === 'virtual';
+  return !midiManager.isListening && !nativeMidi.isActive && microphoneInput.status !== 'listening';
+}
+
+/** Screens where your keys just play the piano (free play between songs). */
+const FREE_PLAY_SCREENS: ReadonlySet<string> = new Set(['home', 'settings', 'results', 'diagnostics']);
 const FIRST_LEVEL = LEVELS[0]!;
 
 type Screen =
@@ -111,6 +120,32 @@ export function App() {
     return () => keyboardSimulator.disable();
   }, [gameSimEnabled]);
 
+  // A keyboard with no speakers of its own: your keys play the game's piano on the menus too.
+  const builtInPiano = builtInPianoOn(settings);
+  const freePlay = FREE_PLAY_SCREENS.has(screen.name) && builtInPiano && (midi.listening || nativeDevices.length > 0);
+  useEffect(() => {
+    if (!freePlay) return;
+    audioEngine.setVolumes({ piano: settings.pianoVolume });
+    const offs = [midiManager, nativeMidi].flatMap((input) => [
+      input.subscribe((e) => (e.type === 'noteOn' ? audioEngine.pianoNoteOn(e.note, e.velocity) : audioEngine.pianoNoteOff(e.note))),
+      input.subscribePedal?.((p) => audioEngine.pianoSustain(p.down)) ?? (() => undefined),
+    ]);
+    return () => {
+      offs.forEach((off) => off());
+      audioEngine.pianoAllOff();
+    };
+  }, [freePlay, settings.pianoVolume]);
+  // Browsers only start audio after a click or key press on the page; any one will do.
+  useEffect(() => {
+    const unlock = () => audioEngine.unlock();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
   const startLevel = useCallback(
     (
       level: LevelDefinition,
@@ -121,10 +156,7 @@ export function App() {
     ) => {
       // Always called from a click: the moment browsers allow audio to start.
       audioEngine.unlock();
-      // Auto: built-in piano only when nothing else makes sound (never on top of an acoustic piano).
-      const virtualPiano =
-        settings.pianoOutput === 'virtual' ||
-        (settings.pianoOutput === 'auto' && !midiManager.isListening && !nativeMidi.isActive && microphoneInput.status !== 'listening');
+      const virtualPiano = builtInPianoOn(settings);
       setSelected(level);
       setRun((r) => r + 1);
       // Settings are frozen for the duration of a run.
@@ -302,6 +334,12 @@ export function App() {
           onListen={() => startLevel(selected, 'flow', settings.practiceSpeed, null, { listen: true })}
           onPracticeSection={(section) => startLevel(selected, settings.preferredMode, settings.practiceSpeed, section)}
           onSettings={toSettings}
+          builtInPiano={builtInPiano}
+          onBuiltInPianoChange={(on) => {
+            audioEngine.unlock();
+            updateSettings({ pianoOutput: on ? 'virtual' : 'physical', pianoSoundAsked: true });
+          }}
+          askPianoSound={(midi.listening || nativeDevices.length > 0) && settings.pianoOutput === 'auto' && !settings.pianoSoundAsked}
         />
       );
   }

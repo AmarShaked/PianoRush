@@ -75,10 +75,10 @@ export function SettingsScreen(props: SettingsScreenProps) {
             <h2 id="sound-heading">🔊 Sound</h2>
             <label className="field">
               <span>Who makes the piano sound?</span>
-              <select value={settings.pianoOutput} onChange={(e) => onSettingsChange({ pianoOutput: e.target.value as PianoOutput })}>
-                <option value="auto">Auto — built-in unless a MIDI piano is connected</option>
-                <option value="physical">My piano makes the sound</option>
-                <option value="virtual">Built-in piano sound</option>
+              <select value={settings.pianoOutput} onChange={(e) => onSettingsChange({ pianoOutput: e.target.value as PianoOutput, pianoSoundAsked: true })}>
+                <option value="auto">Auto — the game's piano unless a MIDI keyboard is connected</option>
+                <option value="physical">My keyboard has its own sound (speakers)</option>
+                <option value="virtual">The game's piano — for keyboards with no sound</option>
               </select>
               <small className="muted">The backing track never plays your melody (unless the helper or Listen is on), so nothing is doubled.</small>
             </label>

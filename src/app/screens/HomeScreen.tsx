@@ -27,6 +27,11 @@ interface HomeScreenProps {
   onListen: () => void;
   onPracticeSection: (section: PracticeSection) => void;
   onSettings: () => void;
+  /** The game's piano sounds your keys (see Settings → Sound). */
+  builtInPiano: boolean;
+  onBuiltInPianoChange: (on: boolean) => void;
+  /** A MIDI keyboard just connected and we don't know yet whether it has its own sound. */
+  askPianoSound: boolean;
   onImport: () => void;
   onDeleteSong: (level: LevelDefinition) => void;
 }
@@ -41,7 +46,8 @@ interface HomeScreenProps {
  */
 export function HomeScreen(props: HomeScreenProps) {
   const { mic, nativeDevices, collections, world: selectedWorld, progress, selected, onSelect, midi, settings, onSettingsChange } = props;
-  const { onPlay, onListen, onPracticeSection, onSettings, onImport, onDeleteSong } = props;
+  const { onPlay, onListen, onPracticeSection, onSettings, onImport, onDeleteSong, builtInPiano, onBuiltInPianoChange, askPianoSound } = props;
+  const externalPiano = midi.listening || nativeDevices.length > 0;
   // A collection with no songs yet (an empty "My Songs") can still be opened.
   const [emptyTab, setEmptyTab] = useState<WorldDefinition | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -138,6 +144,21 @@ export function HomeScreen(props: HomeScreenProps) {
         </h1>
         <div className="top-bar-right">
           <InputChip midi={midi} mic={mic} nativeDevices={nativeDevices} keyboard={settings.keyboardSimulator} onClick={onSettings} />
+          {externalPiano && (
+            <button
+              className={`sound-toggle${builtInPiano ? ' on' : ''}`}
+              role="switch"
+              aria-checked={builtInPiano}
+              onClick={() => onBuiltInPianoChange(!builtInPiano)}
+              title={
+                builtInPiano
+                  ? 'The game plays a piano sound when you press your keys. Turn off if your keyboard has its own sound.'
+                  : 'Your keyboard makes the sound. Turn on if your keyboard has no sound of its own.'
+              }
+            >
+              <span aria-hidden>{builtInPiano ? '🔊' : '🔇'}</span> <span className="sound-toggle-text">Game piano {builtInPiano ? 'ON' : 'OFF'}</span>
+            </button>
+          )}
           <div className="star-total" aria-label={`${earned} of ${pathLevels.length * 3} stars collected`}>
             ⭐ {earned}
           </div>
@@ -247,6 +268,35 @@ export function HomeScreen(props: HomeScreenProps) {
       </div>
 
       {!desktop && sheetOpen && levels.includes(selected) && renderSheet(false)}
+
+      {askPianoSound && (
+        <div className="sheet-backdrop">
+          <section className="sheet ask-sound" role="dialog" aria-modal="true" aria-labelledby="ask-sound-title" style={lookStyle(look)}>
+            <div className="cheer-emoji" aria-hidden>
+              🎹
+            </div>
+            <h2 id="ask-sound-title">Your piano is connected!</h2>
+            <p className="sheet-goal">Press a key. Can you hear it?</p>
+            <div className="big-actions">
+              <button className="big-action action-listen" onClick={() => onBuiltInPianoChange(false)}>
+                <span className="big-icon" aria-hidden>
+                  🔊
+                </span>
+                <span className="big-name">Yes</span>
+                <span className="big-text">My keyboard has its own sound</span>
+              </button>
+              <button className="big-action action-play" onClick={() => onBuiltInPianoChange(true)} autoFocus>
+                <span className="big-icon" aria-hidden>
+                  🔇
+                </span>
+                <span className="big-name">No sound</span>
+                <span className="big-text">Use the game's piano</span>
+              </button>
+            </div>
+            <p className="option-hint center">You can change this any time with the 🔊 button at the top.</p>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
